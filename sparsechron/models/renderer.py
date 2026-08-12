@@ -96,7 +96,15 @@ class GaussianRenderer:
         if isinstance(out, tuple) and len(out) >= 3:
             rgb = out[0]
             meta = out[2]
-            means2d = meta.get("means2d", torch.zeros_like(means[..., :2]))
+            if "gaussian_ids" in meta and "means2d" in meta:
+                nnz_means2d = meta["means2d"]
+                gaussian_ids = meta["gaussian_ids"]
+                means2d = torch.zeros((means.shape[0], 2), device=device)
+                means2d[gaussian_ids] = nnz_means2d
+            else:
+                means2d = meta.get("means2d", torch.zeros_like(means[..., :2]))
+                if means2d.ndim == 3:
+                    means2d = means2d.squeeze(0)
         else:
             rgb = out[0] if isinstance(out, tuple) else out
             means2d = torch.zeros_like(means[..., :2])
