@@ -140,6 +140,10 @@ class DensificationScheduler:
             new_params[name] = new_data
             
         self._update_parameters_and_optimizer(new_params, mode="cat", mask=mask)
+        
+        if hasattr(self.model, "is_dynamic"):
+            new_is_dynamic = torch.cat([self.model.is_dynamic, self.model.is_dynamic[mask]], dim=0)
+            self.model.register_buffer("is_dynamic", new_is_dynamic)
 
     def _filter_gaussians(self, keep_mask: torch.Tensor) -> None:
         """Filters Gaussians keeping only those indicated by the mask.
@@ -154,6 +158,10 @@ class DensificationScheduler:
             new_params[name] = new_data
             
         self._update_parameters_and_optimizer(new_params, mode="filter", mask=keep_mask)
+        
+        if hasattr(self.model, "is_dynamic"):
+            new_is_dynamic = self.model.is_dynamic[keep_mask]
+            self.model.register_buffer("is_dynamic", new_is_dynamic)
 
     def _update_parameters_and_optimizer(
         self, new_params: Dict[str, torch.Tensor], mode: str, mask: torch.Tensor
