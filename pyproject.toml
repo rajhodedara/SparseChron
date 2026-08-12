@@ -6,7 +6,7 @@ build-backend = "setuptools.build_meta"
 name = "sparsechron"
 version = "0.1.0"
 description = "4D Gaussian Splatting scene reconstruction system"
-requires-python = ">=3.10,<3.11"
+requires-python = ">=3.10"
 dependencies = [
     "torch>=2.1.0",
     "gsplat>=1.0.0",
