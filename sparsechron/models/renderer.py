@@ -96,16 +96,21 @@ class GaussianRenderer:
         if isinstance(out, tuple) and len(out) >= 3:
             rgb = out[0]
             meta = out[2]
-            depth = meta.get("depths", torch.zeros_like(rgb[..., :1]))
             means2d = meta.get("means2d", torch.zeros_like(means[..., :2]))
         else:
             rgb = out[0] if isinstance(out, tuple) else out
-            depth = torch.zeros(
-                (camera.height, camera.width, 1), device=device
-            )
             means2d = torch.zeros_like(means[..., :2])
 
-        # Squeeze camera dimension (C=1)
+        # If render_mode="RGB+ED", rgb will have 4 channels.
+        if rgb.shape[-1] == 4:
+            depth = rgb[..., 3:4]
+            rgb = rgb[..., :3]
+        else:
+            depth = torch.zeros((rgb.shape[0] if rgb.ndim == 4 else 1, camera.height, camera.width, 1), device=device)
+            if rgb.ndim == 3:
+                depth = depth.squeeze(0)
+
+        # Squeeze camera dimension (C=1) if batched
         if rgb.ndim == 4:
             rgb = rgb.squeeze(0)
         if depth.ndim == 4:
