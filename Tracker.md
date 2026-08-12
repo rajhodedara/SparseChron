@@ -62,13 +62,12 @@ completed and add notes where useful.
 
 ## Phase 6 — Evaluation & Benchmarking
 
-- [ ] 6.1 Metrics module (PSNR, SSIM, LPIPS)
-- [ ] 6.2 Novel view renderer
-- [ ] 6.3 Benchmark orchestrator
-- [ ] 6.4 `scripts/evaluate.py` CLI
-- [ ] 6.5 Train + evaluate vanilla 4DGS baseline
-- [ ] 6.6 Full benchmark suite (≥2 NeRF-Synthetic + ≥1 HyperNeRF)
-- [ ] 6.7 Results table + bar charts
+- [x] 6.1 Implement `sparsechron/evaluation/metrics.py`
+- [x] 6.2 Implement `sparsechron/evaluation/render_novel_views.py`
+- [x] 6.3 Implement `sparsechron/evaluation/benchmark.py`
+- [x] 6.4 Write `scripts/evaluate.py`
+- [ ] 6.5 Run benchmark suite on Kaggle
+- [ ] 6.6 Generate results table + bar charts
 
 ## Phase 7 — Viser Interactive Viewer
 
