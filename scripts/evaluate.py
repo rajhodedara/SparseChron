@@ -28,11 +28,21 @@ def main(
     print(f"Loading checkpoint from {checkpoint_path}...")
     checkpoint = torch.load(checkpoint_path, map_location=device)
     
-    model = GaussianModel()
-    if 'model_state_dict' in checkpoint:
-        model.load_state_dict(checkpoint['model_state_dict'])
-    else:
-        model.load_state_dict(checkpoint)
+    # Create dummy initial values based on checkpoint size
+    state_dict = checkpoint.get('model_state_dict', checkpoint)
+    num_gaussians = state_dict['_positions'].shape[0]
+    sh_degree = state_dict['_sh_coeffs'].shape[1]
+    
+    dummy_values = {
+        "positions": torch.zeros((num_gaussians, 3), device=device),
+        "scales": torch.zeros((num_gaussians, 3), device=device),
+        "rotations": torch.zeros((num_gaussians, 4), device=device),
+        "opacities": torch.zeros((num_gaussians, 1), device=device),
+        "sh_coeffs": torch.zeros((num_gaussians, sh_degree, 3), device=device),
+    }
+    
+    model = GaussianModel(dummy_values)
+    model.load_state_dict(state_dict)
     model.to(device)
     model.eval()
     
@@ -41,13 +51,17 @@ def main(
         deformation_mlp = DeformationMLP()
         if 'deformation_state_dict' in checkpoint:
             deformation_mlp.load_state_dict(checkpoint['deformation_state_dict'])
+        elif 'deformation_mlp_state_dict' in checkpoint:
+            deformation_mlp.load_state_dict(checkpoint['deformation_mlp_state_dict'])
         deformation_mlp.to(device)
         deformation_mlp.eval()
         
     print(f"Loading dataset from {dataset_path}...")
-    dataset = SceneDataset(dataset_path, split="test")
+    # Our SceneDataset loads all images from the folder, regardless of split.
+    dataset = SceneDataset(dataset_path)
     
-    renderer = Renderer()
+    from sparsechron.models.renderer import GaussianRenderer
+    renderer = GaussianRenderer()
     
     print("Rendering novel views...")
     render_out_dir = pathlib.Path(output_dir) / "renders"
