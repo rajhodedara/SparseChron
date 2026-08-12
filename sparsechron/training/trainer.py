@@ -131,7 +131,14 @@ class Trainer:
             self.optimizer.zero_grad()
             
             if iteration % 100 == 0:
-                print(f"Iteration {iteration}: Loss {loss.item():.4f}, Active Gaussians {self.model.positions.shape[0]}")
+                max_vram_gb = torch.cuda.max_memory_allocated() / (1024**3) if torch.cuda.is_available() else 0.0
+                print(
+                    f"Iteration {iteration}: Loss {loss.item():.4f}, "
+                    f"Active Gaussians {self.model.positions.shape[0]}, "
+                    f"Max VRAM: {max_vram_gb:.2f} GB"
+                )
+                if torch.cuda.is_available():
+                    torch.cuda.reset_peak_memory_stats()
             
             if self.config.densify_from_iter <= iteration <= self.config.densify_until_iter:
                 self.scheduler.step(iteration)

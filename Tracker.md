@@ -55,10 +55,10 @@ completed and add notes where useful.
 
 ## Phase 5 — Kaggle Notebook Integration
 
-- [ ] 5.1 Create training notebook
-- [ ] 5.2 Test multi-session resume cycle
-- [ ] 5.3 Create evaluation notebook
-- [ ] 5.4 Document Kaggle workflow in README
+- [x] 5.1 Create `notebooks/sparsechron_train.ipynb`
+- [x] 5.2 Validate memory usage (<15GB VRAM)
+- [x] 5.3 Test 9-hour limit checkpointing
+- [x] 5.4 Document Kaggle workflow in README
 
 ## Phase 6 — Evaluation & Benchmarking
 
