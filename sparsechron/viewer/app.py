@@ -138,7 +138,8 @@ class ViewerApp:
                         )
 
                         if not self.bg_checkbox.value:
-                            static_mask = ~self.model.is_dynamic
+                            is_dynamic: torch.Tensor = self.model.is_dynamic  # type: ignore
+                            static_mask = ~is_dynamic
                             deformed_params["opacities"][static_mask] = 0.0
 
                         out = self.renderer.render(
@@ -151,7 +152,8 @@ class ViewerApp:
 
                     # Update stats
                     if not self.bg_checkbox.value:
-                        active_gaussians = int(self.model.is_dynamic.sum().item())
+                        is_dynamic: torch.Tensor = self.model.is_dynamic  # type: ignore
+                        active_gaussians = int(is_dynamic.sum().item())
                     else:
                         active_gaussians = int(self.model.positions.shape[0])
 
