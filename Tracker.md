@@ -30,15 +30,15 @@ completed and add notes where useful.
 
 ## Phase 3 — Static 3DGS Baseline
 
-- [ ] 3.1 `GaussianModel` class
-- [ ] 3.2 gsplat renderer wrapper
-- [ ] 3.3 Photometric loss (L1 + SSIM)
-- [ ] 3.4 Depth loss
-- [ ] 3.5 Densification & pruning scheduler
-- [ ] 3.6 Checkpoint save/load/resume
-- [ ] 3.7 Training loop (static-only)
-- [ ] 3.8 `scripts/train.py` CLI
-- [ ] 3.9 Unit tests (gaussians, renderer, checkpoint, losses)
+- [x] 3.1 `GaussianModel` class
+- [x] 3.2 gsplat renderer wrapper
+- [x] 3.3 Photometric loss (L1 + SSIM)
+- [x] 3.4 Depth loss
+- [x] 3.5 Densification & pruning scheduler
+- [x] 3.6 Checkpoint save/load/resume
+- [x] 3.7 Training loop (static-only)
+- [x] 3.8 `scripts/train.py` CLI
+- [x] 3.9 Unit tests (gaussians, renderer, checkpoint, losses)
 - [ ] 3.10 Train `lego` — verify PSNR > 25 dB
 
 ## Phase 4 — Temporal Deformation (4DGS)

@@ -1,1 +1,86 @@
-"""Checkpoint saving and loading utilities."""
+import os
+import torch
+import torch.nn as nn
+from torch.optim import Optimizer
+from pathlib import Path
+from typing import Optional, Tuple, Dict, Any, Union
+
+def save_checkpoint(
+    path: Union[Path, str],
+    iteration: int,
+    model: nn.Module,
+    optimizer: Optional[Optimizer] = None,
+    extra_state: Optional[Dict[str, Any]] = None
+) -> None:
+    """Saves a training checkpoint atomically.
+    
+    Args:
+        path: The path to save the checkpoint to.
+        iteration: The current training iteration.
+        model: The model to save.
+        optimizer: The optimizer to save (optional).
+        extra_state: Additional state to save (optional).
+    """
+    path = Path(path)
+    tmp_path = path.with_suffix(".tmp")
+    
+    state = {
+        "iteration": iteration,
+        "model_state_dict": model.state_dict(),
+        "optimizer_state_dict": optimizer.state_dict() if optimizer else None,
+        "extra_state": extra_state or {},
+    }
+    
+    path.parent.mkdir(parents=True, exist_ok=True)
+    torch.save(state, tmp_path)
+    os.replace(tmp_path, path)
+
+def load_checkpoint(
+    path: Union[Path, str],
+    model: nn.Module,
+    optimizer: Optional[Optimizer] = None
+) -> Tuple[int, Dict[str, Any]]:
+    """Loads a training checkpoint.
+    
+    Args:
+        path: The path to load the checkpoint from.
+        model: The model to load weights into.
+        optimizer: The optimizer to load state into (optional).
+        
+    Returns:
+        A tuple containing the iteration and the extra state dictionary.
+    """
+    path = Path(path)
+    checkpoint = torch.load(path, map_location="cpu")
+    
+    model.load_state_dict(checkpoint["model_state_dict"])
+    if optimizer and checkpoint.get("optimizer_state_dict"):
+        optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
+        
+    return checkpoint.get("iteration", 0), checkpoint.get("extra_state", {})
+
+def find_latest_checkpoint(directory: Union[Path, str]) -> Optional[Path]:
+    """Finds the latest checkpoint in a directory based on iteration number.
+    
+    Args:
+        directory: The directory to search.
+        
+    Returns:
+        The path to the latest checkpoint, or None if no checkpoints are found.
+    """
+    directory = Path(directory)
+    if not directory.is_dir():
+        return None
+    
+    checkpoints = list(directory.glob("*.ckpt"))
+    if not checkpoints:
+        return None
+    
+    def extract_iter(p: Path) -> Tuple[int, float]:
+        parts = p.stem.split("_")
+        for part in reversed(parts):
+            if part.isdigit():
+                return (1, int(part))
+        return (0, p.stat().st_mtime)
+    
+    return max(checkpoints, key=extract_iter)
