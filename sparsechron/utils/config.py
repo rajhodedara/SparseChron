@@ -66,3 +66,8 @@ class TrainConfig:
 
     # Hardware
     mixed_precision: bool = True
+
+    # 4D settings
+    is_4d: bool = False
+    reclassify_interval: int = 2000
+

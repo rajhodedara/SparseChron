@@ -13,6 +13,9 @@ from sparsechron.training.checkpoint import save_checkpoint, load_checkpoint, fi
 from sparsechron.utils.timer import Timer
 from sparsechron.losses.photometric import photometric_loss
 from sparsechron.losses.depth import depth_loss
+from sparsechron.losses.regularization import texture_regularization_loss
+from sparsechron.models.deformation import DeformationMLP
+from sparsechron.models.classifier import StaticDynamicClassifier
 
 
 class Trainer:
@@ -45,6 +48,20 @@ class Trainer:
         self.scheduler = scheduler
         self.timer = Timer()
 
+        self.deformation_mlp = None
+        self.classifier = None
+        if self.config.is_4d:
+            self.deformation_mlp = DeformationMLP().to(self.model.positions.device)
+            self.classifier = StaticDynamicClassifier(num_gaussians=self.model.positions.shape[0])
+            self.classifier.cum_deformation = self.classifier.cum_deformation.to(self.model.positions.device)
+            
+            # Add deformation MLP to optimizer
+            self.optimizer.add_param_group({
+                "params": self.deformation_mlp.parameters(),
+                "lr": self.config.lr_deformation,
+                "name": "deformation_mlp"
+            })
+
     def train(self) -> None:
         """Runs the training loop."""
         self.timer.reset()
@@ -56,7 +73,13 @@ class Trainer:
         if self.config.resume_from:
             ckpt_path = find_latest_checkpoint(self.config.output_dir) if self.config.resume_from == "latest" else self.config.resume_from
             if ckpt_path and Path(ckpt_path).exists():
-                start_iter, _ = load_checkpoint(ckpt_path, self.model, self.optimizer)
+                start_iter, _ = load_checkpoint(
+                    ckpt_path, 
+                    self.model, 
+                    self.optimizer,
+                    deformation_mlp=self.deformation_mlp,
+                    classifier=self.classifier
+                )
                 start_iter += 1 # start at next iteration
         
         for iteration in range(start_iter, self.config.max_iterations + 1):
@@ -67,7 +90,17 @@ class Trainer:
             gt_image = item["image"].to(self.model.positions.device)
             gt_depth = item["depth"].to(self.model.positions.device) if item["depth"] is not None else None
             
-            render_dict = self.renderer.render(self.model, camera)
+            deformed_params = None
+            if self.config.is_4d:
+                # Sample a random timestep in [0, 1]
+                timestep = random.random()
+                deformed_params = self.model.get_deformed(self.deformation_mlp, timestep)
+                
+                # Update classifier with dynamic d_pos
+                d_pos_full = deformed_params["d_pos"]
+                self.classifier.update(d_pos_full, mask=self.model.is_dynamic)
+
+            render_dict = self.renderer.render(self.model, camera, deformed_params=deformed_params)
             pred_image = render_dict["rgb"].permute(2, 0, 1)
             
             loss = photometric_loss(pred_image, gt_image, self.config.ssim_weight)
@@ -75,6 +108,15 @@ class Trainer:
             if gt_depth is not None and self.config.lambda_depth > 0:
                 loss_d = depth_loss(render_dict["depth"], gt_depth)
                 loss = loss + self.config.lambda_depth * loss_d
+
+            if self.config.is_4d:
+                # Calculate texture regularization loss
+                projected_points = render_dict["means2d"]
+                d_pos_dyn = deformed_params["d_pos"][self.model.is_dynamic]
+                proj_pts_dyn = projected_points[self.model.is_dynamic]
+                
+                reg_loss = texture_regularization_loss(d_pos_dyn, proj_pts_dyn, gt_image)
+                loss = loss + self.config.lambda_deform_reg * reg_loss
                 
             if not torch.isfinite(loss):
                 print(f"Warning: Non-finite loss at iteration {iteration}. Halving learning rates and skipping step.")
@@ -93,8 +135,20 @@ class Trainer:
             
             if self.config.densify_from_iter <= iteration <= self.config.densify_until_iter:
                 self.scheduler.step(iteration)
-                
+                if self.config.is_4d and self.classifier.cum_deformation.shape[0] != self.model.positions.shape[0]:
+                    self.classifier.resize(self.model.positions.shape[0])
+
+            if self.config.is_4d and iteration % self.config.reclassify_interval == 0:
+                self.classifier.reclassify(self.model, threshold=0.01)  # Using 0.01 as threshold for now
+
             if self.timer.elapsed_minutes() >= self.config.checkpoint_interval_minutes:
                 checkpoint_path = output_dir / f"checkpoint_{iteration}.ckpt"
-                save_checkpoint(checkpoint_path, iteration, self.model, self.optimizer)
+                save_checkpoint(
+                    checkpoint_path, 
+                    iteration, 
+                    self.model, 
+                    self.optimizer,
+                    deformation_mlp=self.deformation_mlp,
+                    classifier=self.classifier
+                )
                 self.timer.reset()

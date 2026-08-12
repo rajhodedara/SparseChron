@@ -1,6 +1,7 @@
 import torch
 from torch import nn
 from typing import Dict
+from sparsechron.models.deformation import apply_offsets
 
 
 class GaussianModel(nn.Module):
@@ -35,6 +36,11 @@ class GaussianModel(nn.Module):
         self._rotations = nn.Parameter(initial_values["rotations"])
         self._opacities = nn.Parameter(initial_values["opacities"])
         self._sh_coeffs = nn.Parameter(initial_values["sh_coeffs"])
+        
+        self.register_buffer(
+            "is_dynamic",
+            torch.ones(self._positions.shape[0], dtype=torch.bool, device=self._positions.device)
+        )
 
     @property
     def positions(self) -> torch.Tensor:
@@ -85,3 +91,78 @@ class GaussianModel(nn.Module):
             The spherical harmonics coefficients (N, D, 3).
         """
         return self._sh_coeffs
+
+    def get_deformed(self, deformation_mlp: nn.Module, timestep: float) -> Dict[str, torch.Tensor]:
+        """Gets the fully activated and deformed parameters for a specific timestep.
+
+        Args:
+            deformation_mlp (nn.Module): The deformation MLP.
+            timestep (float): The current timestep.
+
+        Returns:
+            Dict[str, torch.Tensor]: A dictionary containing the deformed and
+                activated parameters ('positions', 'scales', 'rotations',
+                'opacities', 'sh_coeffs').
+        """
+
+        
+        # Get activated base parameters
+        pos = self.positions
+        rot = self.rotations
+        scale = self.scales
+        opacity = self.opacities
+        sh = self.sh_coeffs
+
+        if not self.is_dynamic.any():
+            return {
+                "positions": pos,
+                "scales": scale,
+                "rotations": rot,
+                "opacities": opacity,
+                "sh_coeffs": sh,
+            }
+
+        # Filter dynamic parameters
+        dyn_pos = pos[self.is_dynamic]
+        
+        # We need to apply offsets. Wait, the prompt says:
+        # "Apply offsets to get deformed dynamic parameters."
+        # Should we apply them to activated or unactivated? 
+        # Typically offsets are applied to unactivated scale/rot, or maybe activated?
+        # "New pos = pos + d_pos, new scale = scale + d_scale. For rotations, use quaternion multiplication quat_mul(rot, d_rot) and then normalize."
+        # If we use `pos`, `rot`, `scale`, let's just use the activated ones since `apply_offsets` uses `quat_mul` and `new_scale = scale + d_scale`.
+        
+        dyn_rot_act = rot[self.is_dynamic]
+        dyn_scale_act = scale[self.is_dynamic]
+
+        # Prepare inputs for MLP
+        times = torch.full((dyn_pos.shape[0], 1), timestep, device=dyn_pos.device, dtype=dyn_pos.dtype)
+        
+        # Get offsets from MLP
+        d_pos, d_rot, d_scale = deformation_mlp(dyn_pos, times)
+        
+        # Apply offsets
+        def_pos, def_rot, def_scale = apply_offsets(
+            dyn_pos, dyn_rot_act, dyn_scale_act, d_pos, d_rot, d_scale
+        )
+
+        # Re-combine with static parameters
+        final_pos = pos.clone()
+        final_rot = rot.clone()
+        final_scale = scale.clone()
+
+        final_pos[self.is_dynamic] = def_pos
+        final_rot[self.is_dynamic] = def_rot
+        final_scale[self.is_dynamic] = def_scale
+
+        d_pos_full = torch.zeros_like(pos)
+        d_pos_full[self.is_dynamic] = d_pos
+
+        return {
+            "positions": final_pos,
+            "scales": final_scale,
+            "rotations": final_rot,
+            "opacities": opacity,
+            "sh_coeffs": sh,
+            "d_pos": d_pos_full,
+        }

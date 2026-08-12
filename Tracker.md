@@ -43,13 +43,15 @@ completed and add notes where useful.
 
 ## Phase 4 — Temporal Deformation (4DGS)
 
-- [ ] 4.1 `DeformationMLP`
-- [ ] 4.2 `GaussianModel.get_deformed()`
-- [ ] 4.3 Static/dynamic classifier
-- [ ] 4.4 Texture-aware deformation regularization
-- [ ] 4.5 Extend trainer for 4DGS
-- [ ] 4.6 Unit tests (deformation, regularization)
-- [ ] 4.7 Train HyperNeRF — verify temporal motion
+- [x] 4.1 Implement `sparsechron/models/deformation.py`
+- [x] 4.2 Extend `GaussianModel.get_deformed(deformation_mlp, timestep)`
+- [x] 4.3 Implement `sparsechron/models/classifier.py`
+- [x] 4.4 Implement `sparsechron/losses/regularization.py`
+- [x] 4.5 Extend `trainer.py` for 4DGS
+- [x] 4.6 Write unit tests:
+    - `test_deformation.py` — MLP forward shapes, offset application, gradient flow
+    - `test_regularization.py` — texture weight computation, loss shape
+- [ ] 4.7 Train on HyperNeRF `interp` scene (12 sparse views, 30K iterations)
 
 ## Phase 5 — Kaggle Notebook Integration
 

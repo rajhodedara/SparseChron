@@ -10,7 +10,9 @@ def save_checkpoint(
     iteration: int,
     model: nn.Module,
     optimizer: Optional[Optimizer] = None,
-    extra_state: Optional[Dict[str, Any]] = None
+    extra_state: Optional[Dict[str, Any]] = None,
+    deformation_mlp: Optional[nn.Module] = None,
+    classifier: Optional[Any] = None,
 ) -> None:
     """Saves a training checkpoint atomically.
     
@@ -20,6 +22,8 @@ def save_checkpoint(
         model: The model to save.
         optimizer: The optimizer to save (optional).
         extra_state: Additional state to save (optional).
+        deformation_mlp: The deformation MLP to save (optional).
+        classifier: The StaticDynamicClassifier to save (optional).
     """
     path = Path(path)
     tmp_path = path.with_suffix(".tmp")
@@ -31,6 +35,11 @@ def save_checkpoint(
         "extra_state": extra_state or {},
     }
     
+    if deformation_mlp is not None:
+        state["deformation_mlp_state_dict"] = deformation_mlp.state_dict()
+    if classifier is not None:
+        state["classifier_cum_deformation"] = classifier.cum_deformation
+        
     path.parent.mkdir(parents=True, exist_ok=True)
     torch.save(state, tmp_path)
     os.replace(tmp_path, path)
@@ -38,7 +47,9 @@ def save_checkpoint(
 def load_checkpoint(
     path: Union[Path, str],
     model: nn.Module,
-    optimizer: Optional[Optimizer] = None
+    optimizer: Optional[Optimizer] = None,
+    deformation_mlp: Optional[nn.Module] = None,
+    classifier: Optional[Any] = None,
 ) -> Tuple[int, Dict[str, Any]]:
     """Loads a training checkpoint.
     
@@ -46,6 +57,8 @@ def load_checkpoint(
         path: The path to load the checkpoint from.
         model: The model to load weights into.
         optimizer: The optimizer to load state into (optional).
+        deformation_mlp: The deformation MLP to load weights into (optional).
+        classifier: The StaticDynamicClassifier to load state into (optional).
         
     Returns:
         A tuple containing the iteration and the extra state dictionary.
@@ -56,6 +69,11 @@ def load_checkpoint(
     model.load_state_dict(checkpoint["model_state_dict"])
     if optimizer and checkpoint.get("optimizer_state_dict"):
         optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
+        
+    if deformation_mlp and "deformation_mlp_state_dict" in checkpoint:
+        deformation_mlp.load_state_dict(checkpoint["deformation_mlp_state_dict"])
+    if classifier and "classifier_cum_deformation" in checkpoint:
+        classifier.cum_deformation = checkpoint["classifier_cum_deformation"].to(classifier.cum_deformation.device)
         
     return checkpoint.get("iteration", 0), checkpoint.get("extra_state", {})
 

@@ -1,5 +1,5 @@
 import torch
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 
 from sparsechron.models.gaussians import GaussianModel
 from sparsechron.utils.camera import Camera
@@ -18,7 +18,12 @@ class GaussianRenderer:
         """Initializes the GaussianRenderer."""
         pass
 
-    def render(self, model: GaussianModel, camera: Camera) -> Dict[str, torch.Tensor]:
+    def render(
+        self,
+        model: GaussianModel,
+        camera: Camera,
+        deformed_params: Optional[Dict[str, torch.Tensor]] = None,
+    ) -> Dict[str, torch.Tensor]:
         """
         Renders the given Gaussian model from the perspective of the camera.
 
@@ -37,15 +42,23 @@ class GaussianRenderer:
                 "depth": torch.zeros((camera.height, camera.width, 1), device=device)
             }
 
-        # Get activated properties
-        means = model.positions.contiguous()
-        quats = model.rotations.contiguous()
-        scales = model.scales.contiguous()
-        opacities = model.opacities.squeeze(-1).contiguous()
+        if deformed_params is not None:
+            means = deformed_params["positions"].contiguous()
+            quats = deformed_params["rotations"].contiguous()
+            scales = deformed_params["scales"].contiguous()
+            opacities = deformed_params["opacities"].squeeze(-1).contiguous()
+            sh_coeffs = deformed_params["sh_coeffs"]
+        else:
+            means = model.positions.contiguous()
+            quats = model.rotations.contiguous()
+            scales = model.scales.contiguous()
+            opacities = model.opacities.squeeze(-1).contiguous()
+            sh_coeffs = model.sh_coeffs
+
 
         # Extract 0-th order SH for base color
         sh_c0 = 0.28209479177387814
-        colors = model.sh_coeffs[:, 0, :] * sh_c0 + 0.5
+        colors = sh_coeffs[:, 0, :] * sh_c0 + 0.5
         colors = torch.clamp(colors, 0.0, 1.0).contiguous()
 
         # Build ks (intrinsics)
@@ -84,11 +97,13 @@ class GaussianRenderer:
             rgb = out[0]
             meta = out[2]
             depth = meta.get("depths", torch.zeros_like(rgb[..., :1]))
+            means2d = meta.get("means2d", torch.zeros_like(means[..., :2]))
         else:
             rgb = out[0] if isinstance(out, tuple) else out
             depth = torch.zeros(
                 (camera.height, camera.width, 1), device=device
             )
+            means2d = torch.zeros_like(means[..., :2])
 
         # Squeeze camera dimension (C=1)
         if rgb.ndim == 4:
@@ -98,5 +113,6 @@ class GaussianRenderer:
 
         return {
             "rgb": rgb,
-            "depth": depth
+            "depth": depth,
+            "means2d": means2d
         }
