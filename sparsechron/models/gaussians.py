@@ -113,17 +113,30 @@ class GaussianModel(nn.Module):
         opacity = self.opacities
         sh = self.sh_coeffs
 
-        if not self.is_dynamic.any():
+        # Ensure is_dynamic mask perfectly matches the current number of Gaussians
+        # (in case the scheduler updated Gaussians but the buffer update lagged)
+        current_n = pos.shape[0]
+        if self.is_dynamic.shape[0] != current_n:
+            if self.is_dynamic.shape[0] > current_n:
+                is_dynamic = self.is_dynamic[:current_n]
+            else:
+                padding = torch.ones(current_n - self.is_dynamic.shape[0], dtype=torch.bool, device=pos.device)
+                is_dynamic = torch.cat([self.is_dynamic, padding])
+        else:
+            is_dynamic = self.is_dynamic
+
+        if not is_dynamic.any():
             return {
                 "positions": pos,
                 "scales": scale,
                 "rotations": rot,
                 "opacities": opacity,
                 "sh_coeffs": sh,
+                "d_pos": torch.zeros_like(pos),
             }
 
         # Filter dynamic parameters
-        dyn_pos = pos[self.is_dynamic]
+        dyn_pos = pos[is_dynamic]
         
         # We need to apply offsets. Wait, the prompt says:
         # "Apply offsets to get deformed dynamic parameters."
@@ -132,8 +145,8 @@ class GaussianModel(nn.Module):
         # "New pos = pos + d_pos, new scale = scale + d_scale. For rotations, use quaternion multiplication quat_mul(rot, d_rot) and then normalize."
         # If we use `pos`, `rot`, `scale`, let's just use the activated ones since `apply_offsets` uses `quat_mul` and `new_scale = scale + d_scale`.
         
-        dyn_rot_act = rot[self.is_dynamic]
-        dyn_scale_act = scale[self.is_dynamic]
+        dyn_rot_act = rot[is_dynamic]
+        dyn_scale_act = scale[is_dynamic]
 
         # Prepare inputs for MLP
         times = torch.full((dyn_pos.shape[0], 1), timestep, device=dyn_pos.device, dtype=dyn_pos.dtype)
@@ -151,12 +164,12 @@ class GaussianModel(nn.Module):
         final_rot = rot.clone()
         final_scale = scale.clone()
 
-        final_pos[self.is_dynamic] = def_pos
-        final_rot[self.is_dynamic] = def_rot
-        final_scale[self.is_dynamic] = def_scale
+        final_pos[is_dynamic] = def_pos
+        final_rot[is_dynamic] = def_rot
+        final_scale[is_dynamic] = def_scale
 
         d_pos_full = torch.zeros_like(pos)
-        d_pos_full[self.is_dynamic] = d_pos
+        d_pos_full[is_dynamic] = d_pos
 
         return {
             "positions": final_pos,
