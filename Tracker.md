@@ -71,11 +71,11 @@ completed and add notes where useful.
 
 ## Phase 7 — Viser Interactive Viewer
 
-- [ ] 7.1 Viser app (load model + render)
-- [ ] 7.2 Time slider widget
-- [ ] 7.3 Play/pause button
-- [ ] 7.4 UI controls (background toggle, stats, snapshot, reset)
-- [ ] 7.5 `scripts/viewer.py` CLI
+- [x] 7.1 Implement `sparsechron/viewer/app.py`
+- [x] 7.2 Add time slider widget
+- [x] 7.3 Add play/pause button
+- [x] 7.4 Add UI controls (stats, snapshots, background toggle)
+- [x] 7.5 Write `scripts/viewer.py`
 - [ ] 7.6 Test viewer with exported model
 
 ## Phase 8 — Polish & Deliverables
