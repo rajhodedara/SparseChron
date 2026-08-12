@@ -28,7 +28,7 @@ class StaticDynamicClassifier:
 
         norms = d_pos.norm(dim=-1)
         if mask is not None:
-            self.cum_deformation[mask] += norms
+            self.cum_deformation[mask] += norms[mask]
         elif norms.shape[0] == self.cum_deformation.shape[0]:
             self.cum_deformation += norms
         else:
