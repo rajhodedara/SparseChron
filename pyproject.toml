@@ -1,0 +1,38 @@
+[build-system]
+requires = ["setuptools>=61.0.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "sparsechron"
+version = "0.1.0"
+description = "4D Gaussian Splatting scene reconstruction system"
+requires-python = ">=3.10,<3.11"
+dependencies = [
+    "torch>=2.1.0",
+    "gsplat>=1.0.0",
+    "viser>=0.2.0",
+    "numpy>=1.24.0",
+    "Pillow>=10.0.0",
+    "torchmetrics>=1.0.0",
+    "lpips>=0.1.4",
+]
+
+[project.optional-dependencies]
+dev = [
+    "tyro>=0.7.0",
+    "tqdm>=4.65.0",
+    "tensorboard>=2.14.0",
+    "matplotlib>=3.7.0",
+    "plyfile>=1.0.0",
+    "safetensors>=0.4.0",
+]
+test = [
+    "pytest>=7.0.0",
+    "ruff>=0.1.0",
+]
+
+[project.scripts]
+sparsechron = "sparsechron.__main__:main"
+
+[tool.setuptools.packages.find]
+include = ["sparsechron*"]

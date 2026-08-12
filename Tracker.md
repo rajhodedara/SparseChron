@@ -1,0 +1,100 @@
+# SparseChron — Tracker
+
+Progress log. Append-only — never rewrite history. Check items off as they are
+completed and add notes where useful.
+
+---
+
+## Phase 1 — Project Scaffolding
+
+- [x] 1.1 Initialize Git repo + `.gitignore`
+- [x] 1.2 Create directory structure
+- [x] 1.3 Write `pyproject.toml`
+- [x] 1.4 Generate `requirements.txt`
+- [x] 1.5 Implement `utils/config.py`
+- [x] 1.6 Implement `utils/camera.py`
+- [x] 1.7 Implement `utils/transforms.py`
+- [x] 1.8 Write unit tests (camera + quaternion)
+- [x] 1.9 Verify `pytest` passes on CPU
+
+## Phase 2 — Data Pipeline
+
+- [x] 2.1 Depth estimation wrapper (Depth Anything V2)
+- [x] 2.2 Pose estimation wrapper (DUSt3R + COLMAP fallback)
+- [x] 2.3 Depth alignment (scale-shift fitting)
+- [x] 2.4 Gaussian initialization from point cloud
+- [x] 2.5 `SceneDataset` class
+- [x] 2.6 DUSt3R + COLMAP loaders
+- [x] 2.7 `scripts/preprocess.py` CLI
+- [x] 2.8 Test on NeRF-Synthetic `lego`
+
+## Phase 3 — Static 3DGS Baseline
+
+- [ ] 3.1 `GaussianModel` class
+- [ ] 3.2 gsplat renderer wrapper
+- [ ] 3.3 Photometric loss (L1 + SSIM)
+- [ ] 3.4 Depth loss
+- [ ] 3.5 Densification & pruning scheduler
+- [ ] 3.6 Checkpoint save/load/resume
+- [ ] 3.7 Training loop (static-only)
+- [ ] 3.8 `scripts/train.py` CLI
+- [ ] 3.9 Unit tests (gaussians, renderer, checkpoint, losses)
+- [ ] 3.10 Train `lego` — verify PSNR > 25 dB
+
+## Phase 4 — Temporal Deformation (4DGS)
+
+- [ ] 4.1 `DeformationMLP`
+- [ ] 4.2 `GaussianModel.get_deformed()`
+- [ ] 4.3 Static/dynamic classifier
+- [ ] 4.4 Texture-aware deformation regularization
+- [ ] 4.5 Extend trainer for 4DGS
+- [ ] 4.6 Unit tests (deformation, regularization)
+- [ ] 4.7 Train HyperNeRF — verify temporal motion
+
+## Phase 5 — Kaggle Notebook Integration
+
+- [ ] 5.1 Create training notebook
+- [ ] 5.2 Test multi-session resume cycle
+- [ ] 5.3 Create evaluation notebook
+- [ ] 5.4 Document Kaggle workflow in README
+
+## Phase 6 — Evaluation & Benchmarking
+
+- [ ] 6.1 Metrics module (PSNR, SSIM, LPIPS)
+- [ ] 6.2 Novel view renderer
+- [ ] 6.3 Benchmark orchestrator
+- [ ] 6.4 `scripts/evaluate.py` CLI
+- [ ] 6.5 Train + evaluate vanilla 4DGS baseline
+- [ ] 6.6 Full benchmark suite (≥2 NeRF-Synthetic + ≥1 HyperNeRF)
+- [ ] 6.7 Results table + bar charts
+
+## Phase 7 — Viser Interactive Viewer
+
+- [ ] 7.1 Viser app (load model + render)
+- [ ] 7.2 Time slider widget
+- [ ] 7.3 Play/pause button
+- [ ] 7.4 UI controls (background toggle, stats, snapshot, reset)
+- [ ] 7.5 `scripts/viewer.py` CLI
+- [ ] 7.6 Test viewer with exported model
+
+## Phase 8 — Polish & Deliverables
+
+- [ ] 8.1 Write `README.md`
+- [ ] 8.2 Demo video script
+- [ ] 8.3 Viva defense materials
+- [ ] 8.4 Final code cleanup (docstrings, type hints, ruff)
+- [ ] 8.5 Final benchmark run
+- [ ] 8.6 Tag `v1.0.0`, push to GitHub
+
+---
+
+## Log
+
+| Date | Note |
+|---|---|
+| — | Project planning complete (PRD, TechSpec, AppFlow, Schema, ImplementationPlan, Rules, Tracker) |
+
+---
+
+*Check items off as work is completed. Add dated notes in the Log table for
+significant milestones, blockers, or decisions.*

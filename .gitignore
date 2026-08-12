@@ -1,0 +1,14 @@
+data/
+outputs/
+__pycache__/
+*.ckpt
+*.npy
+
+# Standard Python ignores
+*.egg-info/
+build/
+dist/
+.pytest_cache/
+.ruff_cache/
+.venv/
+venv/
