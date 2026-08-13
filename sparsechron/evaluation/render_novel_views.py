@@ -40,21 +40,22 @@ def render_novel_views(
             timestep = 0.0
             
         if deformation_mlp is not None:
-            # Assuming get_deformed is a method of model or we apply it here.
-            # Depending on project structure, but common approach is:
-            deformed_model = model.get_deformed(deformation_mlp, timestep)
+            deformed_params = model.get_deformed(deformation_mlp, timestep)
+            render_output = renderer.render(model, camera, deformed_params)
         else:
-            deformed_model = model
+            render_output = renderer.render(model, camera)
             
-        # Assuming renderer.render returns a dict with 'image' key or just the image tensor
-        render_output = renderer.render(camera, deformed_model)
-        
         if isinstance(render_output, dict):
-            image = render_output.get("image", render_output.get("render"))
+            image = render_output.get("rgb", render_output.get("image"))
         else:
             image = render_output
             render_output = {"image": image}
             
+        # image is (H, W, 3). vutils.save_image expects (C, H, W)
+        if image is not None and image.ndim == 3:
+            image = image.permute(2, 0, 1)
+            
+        render_output["image"] = image
         rendered_results.append(render_output)
         
         if output_dir is not None and image is not None:
