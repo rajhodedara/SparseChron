@@ -62,6 +62,7 @@ class TrainConfig:
 
     # Checkpoint
     checkpoint_interval_minutes: int = 30
+    checkpoint_iterations: int = 10_000
     resume_from: Optional[str] = None   # path to .ckpt or "latest"
 
     # Hardware
@@ -70,4 +71,6 @@ class TrainConfig:
     # 4D settings
     is_4d: bool = False
     reclassify_interval: int = 2000
+    reclassify_threshold: float = 0.01
+    warmup_iterations: int = 3000
 

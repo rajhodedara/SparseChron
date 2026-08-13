@@ -91,7 +91,7 @@ class Trainer:
             gt_depth = item["depth"].to(self.model.positions.device) if item["depth"] is not None else None
             
             deformed_params = None
-            if self.config.is_4d:
+            if self.config.is_4d and iteration > self.config.warmup_iterations:
                 # Sample a random timestep in [0, 1]
                 timestep = random.random()
                 deformed_params = self.model.get_deformed(self.deformation_mlp, timestep)
@@ -109,7 +109,7 @@ class Trainer:
                 loss_d = depth_loss(render_dict["depth"], gt_depth)
                 loss = loss + self.config.lambda_depth * loss_d
 
-            if self.config.is_4d:
+            if self.config.is_4d and deformed_params is not None:
                 # Calculate texture regularization loss
                 projected_points = render_dict["means2d"]
                 d_pos_dyn = deformed_params["d_pos"][self.model.is_dynamic]
@@ -145,10 +145,12 @@ class Trainer:
                 if self.config.is_4d and self.classifier.cum_deformation.shape[0] != self.model.positions.shape[0]:
                     self.classifier.resize(self.model.positions.shape[0])
 
-            if self.config.is_4d and iteration % self.config.reclassify_interval == 0:
-                self.classifier.reclassify(self.model, threshold=0.01)  # Using 0.01 as threshold for now
+            if self.config.is_4d and iteration > self.config.warmup_iterations and iteration % self.config.reclassify_interval == 0:
+                self.classifier.reclassify(self.model, threshold=self.config.reclassify_threshold)
 
-            if self.timer.elapsed_minutes() >= self.config.checkpoint_interval_minutes or iteration == self.config.max_iterations:
+            time_save = self.timer.elapsed_minutes() >= self.config.checkpoint_interval_minutes
+            iter_save = self.config.checkpoint_iterations > 0 and iteration % self.config.checkpoint_iterations == 0
+            if time_save or iter_save or iteration == self.config.max_iterations:
                 checkpoint_path = output_dir / f"checkpoint_{iteration}.ckpt"
                 save_checkpoint(
                     checkpoint_path, 
