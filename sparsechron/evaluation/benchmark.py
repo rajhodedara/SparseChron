@@ -30,13 +30,19 @@ def compute_metrics(
     if num_images == 0:
         return {"psnr": 0.0, "ssim": 0.0, "lpips": 0.0}
         
+    device = torch.device(
+        "cuda" if torch.cuda.is_available() else "cpu"
+    )
+
     for pred, gt in zip(pred_images, gt_images):
-        pred_b = pred.unsqueeze(0)
-        gt_b = gt.unsqueeze(0)
+        pred_b = pred.unsqueeze(0).to(device)
+        gt_b = gt.unsqueeze(0).to(device)
         
         total_psnr += evaluator.compute_psnr(pred_b, gt_b)
         total_ssim += evaluator.compute_ssim(pred_b, gt_b)
         total_lpips += evaluator.compute_lpips(pred_b, gt_b)
+        
+        del pred_b, gt_b
         
     mean_psnr = total_psnr / num_images
     mean_ssim = total_ssim / num_images
