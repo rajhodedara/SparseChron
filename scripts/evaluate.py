@@ -5,7 +5,6 @@ import torch
 from sparsechron.models.gaussians import GaussianModel
 from sparsechron.models.deformation import DeformationMLP
 from sparsechron.data.dataset import SceneDataset
-from sparsechron.models.renderer import Renderer
 from sparsechron.evaluation.render_novel_views import render_novel_views
 from sparsechron.evaluation.benchmark import compute_metrics, save_metrics
 
