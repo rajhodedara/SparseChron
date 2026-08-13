@@ -61,16 +61,22 @@ def render_novel_views(
         # Convert (H,W,3) -> (C,H,W) for torchvision
         image = rgb.permute(2, 0, 1).clamp(0.0, 1.0)
 
-        render_output["image"] = image
-        rendered_results.append(render_output)
-
         if output_dir is not None:
             image_path = os.path.join(
                 output_dir, f"render_{i:05d}.png"
             )
             vutils.save_image(image, image_path)
 
-        if (i + 1) % 50 == 0 or i == len(dataset) - 1:
+        # Move to CPU immediately to free GPU memory
+        rendered_results.append({
+            "image": image.cpu(),
+        })
+
+        # Clear GPU cache periodically to avoid OOM
+        if (i + 1) % 50 == 0:
+            torch.cuda.empty_cache()
+
+        if (i + 1) % 100 == 0 or i == len(dataset) - 1:
             print(
                 f"  Rendered {i + 1}/{len(dataset)} views"
             )
