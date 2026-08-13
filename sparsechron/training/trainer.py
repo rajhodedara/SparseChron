@@ -148,7 +148,7 @@ class Trainer:
             if self.config.is_4d and iteration % self.config.reclassify_interval == 0:
                 self.classifier.reclassify(self.model, threshold=0.01)  # Using 0.01 as threshold for now
 
-            if self.timer.elapsed_minutes() >= self.config.checkpoint_interval_minutes:
+            if self.timer.elapsed_minutes() >= self.config.checkpoint_interval_minutes or iteration == self.config.max_iterations:
                 checkpoint_path = output_dir / f"checkpoint_{iteration}.ckpt"
                 save_checkpoint(
                     checkpoint_path, 
@@ -159,3 +159,6 @@ class Trainer:
                     classifier=self.classifier
                 )
                 self.timer.reset()
+                if iteration == self.config.max_iterations:
+                    print(f"Training complete! Final checkpoint saved to {checkpoint_path}")
+
