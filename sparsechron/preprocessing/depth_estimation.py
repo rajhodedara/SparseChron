@@ -43,28 +43,40 @@ def estimate_depths(
         )
 
     logger.info("Loaded depth_anything_v2 successfully. Running real implementation.")
-        
-        model_configs = {
-            'vits': {'encoder': 'vits', 'features': 64, 'out_channels': [48, 96, 192, 384]},
-            'vitb': {'encoder': 'vitb', 'features': 128, 'out_channels': [96, 192, 384, 768]},
-            'vitl': {'encoder': 'vitl', 'features': 256, 'out_channels': [256, 512, 1024, 1024]},
-            'vitg': {'encoder': 'vitg', 'features': 384, 'out_channels': [1536, 1536, 1536, 1536]}
-        }
-        
-        encoder = 'vitl'
-        model = DepthAnythingV2(**model_configs[encoder])
-        model = model.to(device).eval()
+    
+    model_configs = {
+        'vits': {'encoder': 'vits', 'features': 64, 'out_channels': [48, 96, 192, 384]},
+        'vitb': {'encoder': 'vitb', 'features': 128, 'out_channels': [96, 192, 384, 768]},
+        'vitl': {'encoder': 'vitl', 'features': 256, 'out_channels': [256, 512, 1024, 1024]},
+        'vitg': {'encoder': 'vitg', 'features': 384, 'out_channels': [1536, 1536, 1536, 1536]}
+    }
+    
+    encoder = 'vitl'
+    model = DepthAnythingV2(**model_configs[encoder])
+    
+    try:
+        from huggingface_hub import hf_hub_download
+        ckpt_path = hf_hub_download(repo_id="depth-anything/Depth-Anything-V2-Large", filename="depth_anything_v2_vitl.pth", repo_type="model")
+        model.load_state_dict(torch.load(ckpt_path, map_location='cpu'))
+        logger.info("Loaded DepthAnythingV2 weights from huggingface_hub.")
+    except Exception as e:
+        logger.warning(f"Failed to load weights from HF Hub: {e}. Attempting to load from local 'checkpoints/depth_anything_v2_vitl.pth'")
+        try:
+            model.load_state_dict(torch.load('checkpoints/depth_anything_v2_vitl.pth', map_location='cpu'))
+        except Exception as e2:
+            raise RuntimeError(f"Could not load weights for DepthAnythingV2. Please ensure the weights are available. Error: {e2}")
 
-        for img_path in image_paths:
-            img_path = Path(img_path)
-            raw_image = cv2.imread(str(img_path))
-            if raw_image is None:
-                logger.warning(f"Failed to read image {img_path}")
-                continue
-                
-            depth = model.infer_image(raw_image) # HxW numpy array
+    model = model.to(device).eval()
+
+    for img_path in image_paths:
+        img_path = Path(img_path)
+        raw_image = cv2.imread(str(img_path))
+        if raw_image is None:
+            logger.warning(f"Failed to read image {img_path}")
+            continue
             
-            out_path = output_dir / f"{img_path.stem}_depth.npy"
-            np.save(str(out_path), depth)
-            logger.info(f"Saved depth map for {img_path.name} to {out_path}")
-
+        depth = model.infer_image(raw_image) # HxW numpy array
+        
+        out_path = output_dir / f"{img_path.stem}_depth.npy"
+        np.save(str(out_path), depth)
+        logger.info(f"Saved depth map for {img_path.name} to {out_path}")
