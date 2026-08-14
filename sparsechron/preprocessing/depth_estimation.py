@@ -68,7 +68,9 @@ def estimate_depths(
 
     model = model.to(device).eval()
 
-    for img_path in image_paths:
+    from tqdm import tqdm
+
+    for img_path in tqdm(image_paths, desc="Depth Estimation"):
         img_path = Path(img_path)
         raw_image = cv2.imread(str(img_path))
         if raw_image is None:
