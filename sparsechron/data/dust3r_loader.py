@@ -30,7 +30,36 @@ def load_dust3r_cameras(scene_dir: Path | str) -> List[Camera]:
     with open(cam_file, "r") as f:
         data = json.load(f)
         
-    # If the json has image names, sort by image name to ensure alignment with image files
+    # Support for the dictionary format output by pose_estimation.py
+    if isinstance(data, dict):
+        cameras = []
+        sorted_keys = sorted(data.keys())
+        for key in sorted_keys:
+            item = data[key]
+            intrinsics = item["intrinsics"]
+            pose = torch.tensor(item["pose"], dtype=torch.float32)
+            
+            # Convert c2w to w2c
+            R_c2w = pose[:3, :3]
+            T_c2w = pose[:3, 3]
+            
+            R_w2c = R_c2w.T
+            T_w2c = -R_w2c @ T_c2w
+            
+            cam = Camera(
+                fx=float(intrinsics[0]),
+                fy=float(intrinsics[1]),
+                cx=float(intrinsics[2]),
+                cy=float(intrinsics[3]),
+                width=int(intrinsics[2] * 2),
+                height=int(intrinsics[3] * 2),
+                R=R_w2c,
+                T=T_w2c
+            )
+            cameras.append(cam)
+        return cameras
+        
+    # Fallback to the old list format
     if len(data) > 0 and "image_name" in data[0]:
         data = sorted(data, key=lambda x: x["image_name"])
         
