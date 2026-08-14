@@ -72,61 +72,61 @@ def estimate_poses(
 
     logger.info("Loaded dust3r successfully. Running real implementation.")
 
-        # Real implementation using DUSt3R
-        model = AsymmetricCroCo3DStereo.from_pretrained(
-            "naver/DUSt3R_ViTLarge_BaseDecoder_512_dpt"
-        ).to(device)
+    # Real implementation using DUSt3R
+    model = AsymmetricCroCo3DStereo.from_pretrained(
+        "naver/DUSt3R_ViTLarge_BaseDecoder_512_dpt"
+    ).to(device)
 
-        str_paths = [str(p) for p in image_paths]
-        imgs = load_images(str_paths, size=512)
+    str_paths = [str(p) for p in image_paths]
+    imgs = load_images(str_paths, size=512)
 
-        pairs = make_pairs(
-            imgs, scene_graph="complete", prefilter=None, symmetrize=True
-        )
-        output = inference(pairs, model, device, batch_size=2)
+    pairs = make_pairs(
+        imgs, scene_graph="complete", prefilter=None, symmetrize=True
+    )
+    output = inference(pairs, model, device, batch_size=2)
 
-        # Global alignment
-        scene = global_aligner(
-            output, device=device, mode=GlobalAlignerMode.PointCloudOptimizer
-        )
-        loss = scene.compute_global_alignment(
-            init="mst", niter=300, schedule="linear", lr=0.01
-        )
+    # Global alignment
+    scene = global_aligner(
+        output, device=device, mode=GlobalAlignerMode.PointCloudOptimizer
+    )
+    loss = scene.compute_global_alignment(
+        init="mst", niter=300, schedule="linear", lr=0.01
+    )
 
-        # Extract intrinsics and extrinsics
-        from PIL import Image
+    # Extract intrinsics and extrinsics
+    from PIL import Image
+    
+    cameras = {}
+    for i, img_path in enumerate(image_paths):
+        img_path = Path(img_path)
+        pose = scene.get_im_poses()[i].detach().cpu().numpy()
+        focal_dust3r = scene.get_focals()[i].detach().cpu().item()
         
-        cameras = {}
-        for i, img_path in enumerate(image_paths):
-            img_path = Path(img_path)
-            pose = scene.get_im_poses()[i].detach().cpu().numpy()
-            focal_dust3r = scene.get_focals()[i].detach().cpu().item()
+        with Image.open(img_path) as img:
+            orig_w, orig_h = img.width, img.height
             
-            with Image.open(img_path) as img:
-                orig_w, orig_h = img.width, img.height
-                
-            # DUSt3R resizes longest edge to 512
-            scale = max(orig_w, orig_h) / 512.0
-            focal_orig = focal_dust3r * scale
+        # DUSt3R resizes longest edge to 512
+        scale = max(orig_w, orig_h) / 512.0
+        focal_orig = focal_dust3r * scale
+        
+        cameras[img_path.name] = {
+            "intrinsics": [focal_orig, focal_orig, orig_w / 2.0, orig_h / 2.0], 
+            "pose": pose.tolist()
+        }
+        
+    with open(cameras_path, "w") as f:
+        json.dump(cameras, f, indent=4)
+    
+    # Save point cloud
+    pts3d = scene.get_pts3d().detach().cpu().numpy()
+    valid_mask = scene.get_valid_masks().detach().cpu().numpy()
+    colors = scene.get_colors().detach().cpu().numpy()
+    
+    pts = pts3d[valid_mask]
+    cols = colors[valid_mask]
+    cols = (cols * 255).astype(np.uint8)
+    
+    _write_ply_ascii(ply_path, pts, cols)
             
-            cameras[img_path.name] = {
-                "intrinsics": [focal_orig, focal_orig, orig_w / 2.0, orig_h / 2.0], 
-                "pose": pose.tolist()
-            }
-            
-        with open(cameras_path, "w") as f:
-            json.dump(cameras, f, indent=4)
-        
-        # Save point cloud
-        pts3d = scene.get_pts3d().detach().cpu().numpy()
-        valid_mask = scene.get_valid_masks().detach().cpu().numpy()
-        colors = scene.get_colors().detach().cpu().numpy()
-        
-        pts = pts3d[valid_mask]
-        cols = colors[valid_mask]
-        cols = (cols * 255).astype(np.uint8)
-        
-        _write_ply_ascii(ply_path, pts, cols)
-                
-        logger.info(f"Saved real cameras and point cloud to {output_dir}")
+    logger.info(f"Saved real cameras and point cloud to {output_dir}")
 
