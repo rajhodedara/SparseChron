@@ -77,8 +77,11 @@ def estimate_depths(
             logger.warning(f"Failed to read image {img_path}")
             continue
             
+        out_path = output_dir / f"{img_path.stem}_depth.npy"
+        if out_path.exists():
+            continue
+            
         depth = model.infer_image(raw_image) # HxW numpy array
         
-        out_path = output_dir / f"{img_path.stem}_depth.npy"
         np.save(str(out_path), depth)
         logger.info(f"Saved depth map for {img_path.name} to {out_path}")
