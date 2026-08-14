@@ -64,12 +64,13 @@ def estimate_poses(
         from dust3r.utils.image import load_images
         from dust3r.image_pairs import make_pairs
         from dust3r.cloud_opt import global_aligner, GlobalAlignerMode
-        HAS_DUST3R = True
     except ImportError:
-        HAS_DUST3R = False
+        raise RuntimeError(
+            "dust3r is required but not found. "
+            "Please install it before running pose estimation."
+        )
 
-    if HAS_DUST3R:
-        logger.info("Loaded dust3r successfully. Running real implementation.")
+    logger.info("Loaded dust3r successfully. Running real implementation.")
 
         # Real implementation using DUSt3R
         model = AsymmetricCroCo3DStereo.from_pretrained(
@@ -93,14 +94,23 @@ def estimate_poses(
         )
 
         # Extract intrinsics and extrinsics
+        from PIL import Image
+        
         cameras = {}
         for i, img_path in enumerate(image_paths):
             img_path = Path(img_path)
             pose = scene.get_im_poses()[i].detach().cpu().numpy()
-            focal = scene.get_focals()[i].detach().cpu().item()
+            focal_dust3r = scene.get_focals()[i].detach().cpu().item()
+            
+            with Image.open(img_path) as img:
+                orig_w, orig_h = img.width, img.height
+                
+            # DUSt3R resizes longest edge to 512
+            scale = max(orig_w, orig_h) / 512.0
+            focal_orig = focal_dust3r * scale
             
             cameras[img_path.name] = {
-                "intrinsics": [focal, focal, 256.0, 256.0], 
+                "intrinsics": [focal_orig, focal_orig, orig_w / 2.0, orig_h / 2.0], 
                 "pose": pose.tolist()
             }
             
@@ -120,26 +130,3 @@ def estimate_poses(
                 
         logger.info(f"Saved real cameras and point cloud to {output_dir}")
 
-    else:
-        logger.warning(
-            "dust3r not found. Using mock pose estimation for local development."
-        )
-        
-        cameras = {}
-        for img_path in image_paths:
-            img_path = Path(img_path)
-            cameras[img_path.name] = {
-                "intrinsics": [800.0, 800.0, 320.0, 240.0],
-                "pose": np.eye(4).tolist()
-            }
-            
-        with open(cameras_path, "w") as f:
-            json.dump(cameras, f, indent=4)
-            
-        num_points = 1000
-        mock_pts = np.random.randn(num_points, 3).astype(np.float32)
-        mock_colors = np.random.randint(0, 256, (num_points, 3), dtype=np.uint8)
-        
-        _write_ply_ascii(ply_path, mock_pts, mock_colors)
-
-        logger.info(f"Saved mock cameras.json and init_gaussians.ply to {output_dir}")

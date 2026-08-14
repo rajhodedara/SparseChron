@@ -47,6 +47,7 @@ class Trainer:
         self.renderer = renderer
         self.scheduler = scheduler
         self.timer = Timer()
+        self.scaler = torch.cuda.amp.GradScaler() if self.config.mixed_precision else None
 
         self.deformation_mlp = None
         self.classifier = None
@@ -100,23 +101,24 @@ class Trainer:
                 d_pos_full = deformed_params["d_pos"]
                 self.classifier.update(d_pos_full, mask=self.model.is_dynamic)
 
-            render_dict = self.renderer.render(self.model, camera, deformed_params=deformed_params)
-            pred_image = render_dict["rgb"].permute(2, 0, 1)
-            
-            loss = photometric_loss(pred_image, gt_image, self.config.ssim_weight)
-            
-            if gt_depth is not None and self.config.lambda_depth > 0:
-                loss_d = depth_loss(render_dict["depth"], gt_depth)
-                loss = loss + self.config.lambda_depth * loss_d
-
-            if self.config.is_4d and deformed_params is not None:
-                # Calculate texture regularization loss
-                projected_points = render_dict["means2d"]
-                d_pos_dyn = deformed_params["d_pos"][self.model.is_dynamic]
-                proj_pts_dyn = projected_points[self.model.is_dynamic]
+            with torch.autocast(device_type="cuda", dtype=torch.float16, enabled=self.config.mixed_precision):
+                render_dict = self.renderer.render(self.model, camera, deformed_params=deformed_params)
+                pred_image = render_dict["rgb"].permute(2, 0, 1)
                 
-                reg_loss = texture_regularization_loss(d_pos_dyn, proj_pts_dyn, gt_image)
-                loss = loss + self.config.lambda_deform_reg * reg_loss
+                loss = photometric_loss(pred_image, gt_image, self.config.ssim_weight)
+                
+                if gt_depth is not None and self.config.lambda_depth > 0:
+                    loss_d = depth_loss(render_dict["depth"], gt_depth)
+                    loss = loss + self.config.lambda_depth * loss_d
+
+                if self.config.is_4d and deformed_params is not None:
+                    # Calculate texture regularization loss
+                    projected_points = render_dict["means2d"]
+                    d_pos_dyn = deformed_params["d_pos"][self.model.is_dynamic]
+                    proj_pts_dyn = projected_points[self.model.is_dynamic]
+                    
+                    reg_loss = texture_regularization_loss(d_pos_dyn, proj_pts_dyn, gt_image)
+                    loss = loss + self.config.lambda_deform_reg * reg_loss
                 
             if not torch.isfinite(loss):
                 print(f"Warning: Non-finite loss at iteration {iteration}. Halving learning rates and skipping step.")
@@ -125,10 +127,18 @@ class Trainer:
                     group["lr"] *= 0.5
                 continue
                 
-            loss.backward()
-            
-            self.optimizer.step()
+            if self.scaler is not None:
+                self.scaler.scale(loss).backward()
+                self.scaler.step(self.optimizer)
+                self.scaler.update()
+            else:
+                loss.backward()
+                self.optimizer.step()
+                
             self.optimizer.zero_grad()
+            
+            if iteration % 1000 == 0:
+                torch.cuda.empty_cache()
             
             if iteration % 100 == 0:
                 max_vram_gb = torch.cuda.max_memory_allocated() / (1024**3) if torch.cuda.is_available() else 0.0

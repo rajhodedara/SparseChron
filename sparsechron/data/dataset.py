@@ -110,7 +110,7 @@ class SceneDataset(Dataset):
         depth_dir = self.scene_dir / "depth"
         
         if depth_dir.exists():
-            npy_path = depth_dir / f"{img_path.stem}.npy"
+            npy_path = depth_dir / f"{img_path.stem}_depth.npy"
             if npy_path.exists():
                 depth_arr = np.load(npy_path)
                 depth_tensor = torch.tensor(depth_arr, dtype=torch.float32)
