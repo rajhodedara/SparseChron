@@ -113,12 +113,18 @@ class SceneDataset(Dataset):
             npy_path = depth_dir / f"{img_path.stem}_depth.npy"
             if npy_path.exists():
                 depth_arr = np.load(npy_path)
+                # Disparity Inversion and Normalization [0.2, 0.8]
+                d_min, d_max = depth_arr.min(), depth_arr.max()
+                depth_arr = 0.8 - 0.6 * (depth_arr - d_min) / (d_max - d_min + 1e-8)
                 depth_tensor = torch.tensor(depth_arr, dtype=torch.float32)
             else:
                 png_path = depth_dir / f"{img_path.stem}.png"
                 if png_path.exists():
                     with Image.open(png_path) as depth_img:
                         depth_arr = np.array(depth_img, dtype=np.float32)
+                        # Disparity Inversion and Normalization [0.2, 0.8]
+                        d_min, d_max = depth_arr.min(), depth_arr.max()
+                        depth_arr = 0.8 - 0.6 * (depth_arr - d_min) / (d_max - d_min + 1e-8)
                         depth_tensor = torch.tensor(depth_arr, dtype=torch.float32)
 
             if depth_tensor is not None and self.downscale > 1:
