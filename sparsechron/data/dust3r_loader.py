@@ -46,13 +46,16 @@ def load_dust3r_cameras(scene_dir: Path | str) -> List[Camera]:
             R_w2c = R_c2w.T
             T_w2c = -R_w2c @ T_c2w
             
+            width = item.get("width", int(intrinsics[2] * 2))
+            height = item.get("height", int(intrinsics[3] * 2))
+
             cam = Camera(
                 fx=float(intrinsics[0]),
                 fy=float(intrinsics[1]),
                 cx=float(intrinsics[2]),
                 cy=float(intrinsics[3]),
-                width=int(intrinsics[2] * 2),
-                height=int(intrinsics[3] * 2),
+                width=int(width),
+                height=int(height),
                 R=R_w2c,
                 T=T_w2c
             )

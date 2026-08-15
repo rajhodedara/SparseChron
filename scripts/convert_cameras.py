@@ -30,6 +30,7 @@ def main():
             fy = fx * cam_data["pixel_aspect_ratio"]
             
         cx, cy = cam_data["principal_point"]
+        width, height = cam_data.get("image_size", [int(cx * 2), int(cy * 2)])
 
         pose = np.eye(4)
         pose[:3, :3] = R
@@ -37,6 +38,8 @@ def main():
 
         cameras[img_name] = {
             "intrinsics": [fx, fy, cx, cy],
+            "width": width,
+            "height": height,
             "pose": pose.tolist()
         }
 
