@@ -50,6 +50,8 @@ def main():
         cam = cameras[img_name]
         pose = np.array(cam["pose"])  # 4x4 matrix
         fx, fy, cx, cy = cam["intrinsics"]
+        orig_w = cam["width"]
+        orig_h = cam["height"]
         
         img_path = os.path.join(data_dir, "images", img_name)
         depth_name = img_name.replace(".png", "_depth.npy").replace(".jpg", "_depth.npy")
@@ -80,9 +82,17 @@ def main():
         # FIX 2: Correct Meshgrid generation (Standard X, Y image coordinates)
         x, y = np.meshgrid(np.arange(W), np.arange(H), indexing="xy")
         
+        # Scale intrinsics to match depth resolution
+        scale_w = W / orig_w
+        scale_h = H / orig_h
+        fx_scaled = fx * scale_w
+        fy_scaled = fy * scale_h
+        cx_scaled = cx * scale_w
+        cy_scaled = cy * scale_h
+        
         z = depth_norm
-        x3 = (x - cx) * z / fx
-        y3 = (y - cy) * z / fy
+        x3 = (x - cx_scaled) * z / fx_scaled
+        y3 = (y - cy_scaled) * z / fy_scaled
         
         pts_cam = np.stack([x3, y3, z, np.ones_like(z)], axis=-1).reshape(-1, 4)
         pts_world = (pose @ pts_cam.T).T[:, :3]
