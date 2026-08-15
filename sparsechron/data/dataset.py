@@ -64,6 +64,27 @@ class SceneDataset(Dataset):
                 f"and cameras ({len(self.cameras)})"
             )
             
+        # Automatically detect physical image size and correct camera intrinsics if they don't match
+        with Image.open(self.image_paths[0]) as img:
+            physical_w, physical_h = img.width, img.height
+
+        cam0 = self.cameras[0]
+        if physical_w != cam0.width or physical_h != cam0.height:
+            scale_w = physical_w / cam0.width
+            scale_h = physical_h / cam0.height
+            for i in range(len(self.cameras)):
+                cam = self.cameras[i]
+                self.cameras[i] = Camera(
+                    fx=cam.fx * scale_w,
+                    fy=cam.fy * scale_h,
+                    cx=cam.cx * scale_w,
+                    cy=cam.cy * scale_h,
+                    width=physical_w,
+                    height=physical_h,
+                    R=cam.R.clone(),
+                    T=cam.T.clone()
+                )
+            
         # Adjust cameras for downscale
         if self.downscale > 1:
             for i in range(len(self.cameras)):
