@@ -64,6 +64,27 @@ class SceneDataset(Dataset):
                 f"and cameras ({len(self.cameras)})"
             )
             
+        # Compute scene center for depth normalization
+        rays = []
+        for cam in self.cameras:
+            R_w2c = cam.R.cpu().numpy()
+            T_w2c = cam.T.cpu().numpy()
+            R_c2w = R_w2c.T
+            t = -R_c2w @ T_w2c
+            d = R_c2w @ np.array([0, 0, 1.0])
+            rays.append((t, d))
+        
+        A = np.zeros((3, 3))
+        b = np.zeros(3)
+        for t, d in rays:
+            I = np.eye(3)
+            d = d / np.linalg.norm(d)
+            proj = I - np.outer(d, d)
+            A += proj
+            b += proj @ t
+            
+        self.scene_center = np.linalg.solve(A, b)
+            
         # Automatically detect physical image size and correct camera intrinsics if they don't match
         with Image.open(self.image_paths[0]) as img:
             physical_w, physical_h = img.width, img.height
@@ -131,21 +152,31 @@ class SceneDataset(Dataset):
         depth_dir = self.scene_dir / "depth"
         
         if depth_dir.exists():
+            # Calculate dynamic depth range for this camera
+            cam_obj = self.cameras[idx]
+            R_w2c = cam_obj.R.cpu().numpy()
+            T_w2c = cam_obj.T.cpu().numpy()
+            cam_t = -R_w2c.T @ T_w2c
+            dist_to_center = np.linalg.norm(cam_t - self.scene_center)
+            
+            depth_min_val = max(0.5, dist_to_center - 1.5)
+            depth_max_val = dist_to_center + 1.5
+
             npy_path = depth_dir / f"{img_path.stem}_depth.npy"
             if npy_path.exists():
                 depth_arr = np.load(npy_path)
-                # Disparity Inversion and Normalization [0.2, 0.8]
                 d_min, d_max = depth_arr.min(), depth_arr.max()
-                depth_arr = 0.8 - 0.6 * (depth_arr - d_min) / (d_max - d_min + 1e-8)
+                # Disparity Inversion and Metric Scaling
+                depth_arr = depth_max_val - (depth_max_val - depth_min_val) * (depth_arr - d_min) / (d_max - d_min + 1e-8)
                 depth_tensor = torch.tensor(depth_arr, dtype=torch.float32)
             else:
                 png_path = depth_dir / f"{img_path.stem}.png"
                 if png_path.exists():
                     with Image.open(png_path) as depth_img:
                         depth_arr = np.array(depth_img, dtype=np.float32)
-                        # Disparity Inversion and Normalization [0.2, 0.8]
                         d_min, d_max = depth_arr.min(), depth_arr.max()
-                        depth_arr = 0.8 - 0.6 * (depth_arr - d_min) / (d_max - d_min + 1e-8)
+                        # Disparity Inversion and Metric Scaling
+                        depth_arr = depth_max_val - (depth_max_val - depth_min_val) * (depth_arr - d_min) / (d_max - d_min + 1e-8)
                         depth_tensor = torch.tensor(depth_arr, dtype=torch.float32)
 
             if depth_tensor is not None and self.downscale > 1:

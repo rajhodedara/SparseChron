@@ -20,6 +20,28 @@ def main():
     points_3d = []
     colors_3d = []
 
+    # FIX 4: Calculate actual scene center by intersecting camera optical axes
+    # Some datasets (like HyperNeRF) do not have the object at the origin [0,0,0]
+    rays = []
+    for img_name in images:
+        cam = cameras[img_name]
+        pose = np.array(cam["pose"])
+        t = pose[:3, 3]
+        d = pose[:3, :3] @ np.array([0, 0, 1])
+        rays.append((t, d))
+    
+    A = np.zeros((3, 3))
+    b = np.zeros(3)
+    for t, d in rays:
+        I = np.eye(3)
+        d = d / np.linalg.norm(d)
+        proj = I - np.outer(d, d)
+        A += proj
+        b += proj @ t
+    
+    scene_center = np.linalg.solve(A, b)
+    print(f"Calculated scene center: {scene_center}")
+
     # FIX 3: Sample 10 frames evenly across the entire video trajectory!
     step = max(1, len(images) // 10)
     sampled_images = images[::step][:10] 
@@ -42,10 +64,10 @@ def main():
         
         # FIX 1: Disparity Inversion (Depth Anything outputs inverse depth)
         # High values = close, Low values = far
-        # We scale depth to match the actual distance from camera to scene origin
-        dist_to_origin = np.linalg.norm(pose[:3, 3])
-        depth_min_val = max(0.5, dist_to_origin - 2.0)
-        depth_max_val = dist_to_origin + 2.0
+        # We scale depth to match the actual distance from camera to scene center
+        dist_to_center = np.linalg.norm(pose[:3, 3] - scene_center)
+        depth_min_val = max(0.5, dist_to_center - 1.5)
+        depth_max_val = dist_to_center + 1.5
         
         depth_min_arr = depth.min()
         depth_max_arr = depth.max()
