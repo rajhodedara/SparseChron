@@ -18,7 +18,7 @@ class DensificationScheduler:
         max_gaussians: int = 500_000,
         densify_interval: int = 100,
         prune_interval: int = 500,
-        grad_threshold: float = 0.0002,
+        grad_threshold: float = 0.00001,
         min_opacity: float = 0.005,
         max_scale: float = 0.5,
     ) -> None:

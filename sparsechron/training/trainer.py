@@ -135,8 +135,6 @@ class Trainer:
                 loss.backward()
                 self.optimizer.step()
                 
-            self.optimizer.zero_grad()
-            
             if iteration % 1000 == 0:
                 torch.cuda.empty_cache()
             
@@ -157,6 +155,8 @@ class Trainer:
 
             if self.config.is_4d and iteration > self.config.warmup_iterations and iteration % self.config.reclassify_interval == 0:
                 self.classifier.reclassify(self.model, threshold=self.config.reclassify_threshold)
+
+            self.optimizer.zero_grad()
 
             time_save = self.timer.elapsed_minutes() >= self.config.checkpoint_interval_minutes
             iter_save = self.config.checkpoint_iterations > 0 and iteration % self.config.checkpoint_iterations == 0
