@@ -81,7 +81,7 @@ def estimate_poses(
     imgs = load_images(str_paths, size=512)
 
     pairs = make_pairs(
-        imgs, scene_graph="swin-8", prefilter=None, symmetrize=True
+        imgs, scene_graph="swin-1", prefilter=None, symmetrize=True
     )
     output = inference(pairs, model, device, batch_size=2)
 
