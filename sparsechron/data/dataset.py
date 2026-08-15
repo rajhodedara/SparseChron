@@ -135,5 +135,6 @@ class SceneDataset(Dataset):
         return {
             "camera": self.cameras[idx],
             "image": img_tensor,
-            "depth": depth_tensor
+            "depth": depth_tensor,
+            "timestep": float(idx) / max(1, len(self.image_paths) - 1)
         }

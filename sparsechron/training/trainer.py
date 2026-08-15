@@ -94,7 +94,7 @@ class Trainer:
             deformed_params = None
             if self.config.is_4d and iteration > self.config.warmup_iterations:
                 # Sample a random timestep in [0, 1]
-                timestep = random.random()
+                timestep = float(idx) / max(1, len(self.dataset) - 1)
                 deformed_params = self.model.get_deformed(self.deformation_mlp, timestep)
                 
                 # Update classifier with dynamic d_pos
@@ -115,7 +115,7 @@ class Trainer:
                     # Calculate texture regularization loss
                     projected_points = render_dict["means2d"]
                     d_pos_dyn = deformed_params["d_pos"][self.model.is_dynamic]
-                    proj_pts_dyn = projected_points[self.model.is_dynamic]
+                    proj_pts_dyn = projected_points[self.model.is_dynamic].detach()
                     
                     reg_loss = texture_regularization_loss(d_pos_dyn, proj_pts_dyn, gt_image)
                     loss = loss + self.config.lambda_deform_reg * reg_loss

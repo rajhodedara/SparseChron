@@ -59,7 +59,7 @@ class DeformationMLP(nn.Module):
         final_layer = nn.Linear(hidden_channels, 10)
         nn.init.zeros_(final_layer.weight)
         nn.init.zeros_(final_layer.bias)
-        final_layer.bias.data[0] = 1.0  # Identity quaternion real part (w, x, y, z format)
+        final_layer.bias.data[3] = 1.0  # Identity quaternion real part (w, x, y, z format)
         layers.append(final_layer)
         self.mlp = nn.Sequential(*layers)
 

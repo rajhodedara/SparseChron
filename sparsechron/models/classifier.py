@@ -26,7 +26,7 @@ class StaticDynamicClassifier:
         if self.cum_deformation.device != d_pos.device:
             self.cum_deformation = self.cum_deformation.to(d_pos.device)
 
-        norms = d_pos.norm(dim=-1)
+        norms = d_pos.detach().norm(dim=-1)
         if mask is not None:
             self.cum_deformation[mask] += norms[mask]
         elif norms.shape[0] == self.cum_deformation.shape[0]:
@@ -40,7 +40,10 @@ class StaticDynamicClassifier:
         Args:
             num_gaussians (int): The new number of Gaussians.
         """
-        self.cum_deformation = torch.zeros(num_gaussians, device=self.cum_deformation.device)
+        new_cum_deformation = torch.zeros(num_gaussians, device=self.cum_deformation.device)
+        current_n = min(self.cum_deformation.shape[0], num_gaussians)
+        new_cum_deformation[:current_n] = self.cum_deformation[:current_n]
+        self.cum_deformation = new_cum_deformation
 
     def reclassify(self, model: 'GaussianModel', threshold: float) -> None:
         """Reclassifies Gaussians based on accumulated deformation threshold.
@@ -50,7 +53,7 @@ class StaticDynamicClassifier:
             threshold (float): The threshold for accumulated deformation.
         """
         # Set to False if cum_deformation < threshold
-        is_static = self.cum_deformation.to(model.is_dynamic.device) < threshold
+        is_static = self.cum_deformation.to(model.is_dynamic.device) < (threshold * 2000.0)
         model.is_dynamic[is_static] = False
         
         # Reset the buffer
