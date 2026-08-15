@@ -56,10 +56,8 @@ class GaussianRenderer:
             sh_coeffs = model.sh_coeffs
 
 
-        # Extract 0-th order SH for base color
-        sh_c0 = 0.28209479177387814
-        colors = sh_coeffs[:, 0, :] * sh_c0 + 0.5
-        colors = torch.clamp(colors, 0.0, 1.0).contiguous()
+        # Use a smooth sigmoid activation to prevent dead gradients
+        colors = torch.sigmoid(sh_coeffs[:, 0, :]).contiguous()
 
         # Build ks (intrinsics)
         k = torch.eye(3, dtype=torch.float32, device=device)

@@ -84,7 +84,11 @@ class Trainer:
                 start_iter += 1 # start at next iteration
         
         for iteration in range(start_iter, self.config.max_iterations + 1):
-            idx = random.randint(0, len(self.dataset) - 1)
+            if self.config.debug_single_batch:
+                idx = 0
+            else:
+                idx = random.randint(0, len(self.dataset) - 1)
+                
             item = self.dataset[idx]
             camera = item["camera"]
             
@@ -94,7 +98,7 @@ class Trainer:
             deformed_params = None
             if self.config.is_4d and iteration > self.config.warmup_iterations:
                 # Sample a random timestep in [0, 1]
-                timestep = float(idx) / max(1, len(self.dataset) - 1)
+                timestep = float(idx) / max(1, len(self.dataset) - 1) if len(self.dataset) > 1 else 0.5
                 deformed_params = self.model.get_deformed(self.deformation_mlp, timestep)
                 
                 # Update classifier with dynamic d_pos
@@ -127,13 +131,31 @@ class Trainer:
                     group["lr"] *= 0.5
                 continue
                 
+            # Scale loss for gradient accumulation
+            loss = loss / self.config.gradient_accumulation_steps
+            
             if self.scaler is not None:
                 self.scaler.scale(loss).backward()
-                self.scaler.step(self.optimizer)
-                self.scaler.update()
             else:
                 loss.backward()
-                self.optimizer.step()
+                
+            # Update weights only every gradient_accumulation_steps
+            if iteration % self.config.gradient_accumulation_steps == 0:
+                if self.scaler is not None:
+                    self.scaler.step(self.optimizer)
+                    self.scaler.update()
+                else:
+                    self.optimizer.step()
+                    
+                if self.config.densify_from_iter <= iteration <= self.config.densify_until_iter:
+                    self.scheduler.step(iteration)
+                    if self.config.is_4d and self.classifier.cum_deformation.shape[0] != self.model.positions.shape[0]:
+                        self.classifier.resize(self.model.positions.shape[0])
+
+                if self.config.is_4d and iteration > self.config.warmup_iterations and iteration % self.config.reclassify_interval == 0:
+                    self.classifier.reclassify(self.model, threshold=self.config.reclassify_threshold)
+
+                self.optimizer.zero_grad()
                 
             if iteration % 1000 == 0:
                 torch.cuda.empty_cache()
@@ -141,23 +163,13 @@ class Trainer:
             if iteration % 100 == 0:
                 max_vram_gb = torch.cuda.max_memory_allocated() / (1024**3) if torch.cuda.is_available() else 0.0
                 print(
-                    f"Iteration {iteration}: Loss {loss.item():.4f}, "
+                    f"Iteration {iteration}: Loss {loss.item() * self.config.gradient_accumulation_steps:.4f}, "
                     f"Active Gaussians {self.model.positions.shape[0]}, "
                     f"Max VRAM: {max_vram_gb:.2f} GB"
                 )
                 if torch.cuda.is_available():
                     torch.cuda.reset_peak_memory_stats()
             
-            if self.config.densify_from_iter <= iteration <= self.config.densify_until_iter:
-                self.scheduler.step(iteration)
-                if self.config.is_4d and self.classifier.cum_deformation.shape[0] != self.model.positions.shape[0]:
-                    self.classifier.resize(self.model.positions.shape[0])
-
-            if self.config.is_4d and iteration > self.config.warmup_iterations and iteration % self.config.reclassify_interval == 0:
-                self.classifier.reclassify(self.model, threshold=self.config.reclassify_threshold)
-
-            self.optimizer.zero_grad()
-
             time_save = self.timer.elapsed_minutes() >= self.config.checkpoint_interval_minutes
             iter_save = self.config.checkpoint_iterations > 0 and iteration % self.config.checkpoint_iterations == 0
             if time_save or iter_save or iteration == self.config.max_iterations:

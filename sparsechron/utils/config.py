@@ -41,6 +41,8 @@ class TrainConfig:
 
     # Training
     max_iterations: int = 30_000
+    gradient_accumulation_steps: int = 1
+    debug_single_batch: bool = False
     lr_position: float = 1.6e-4
     lr_sh: float = 2.5e-3
     lr_opacity: float = 5e-2

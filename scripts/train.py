@@ -47,6 +47,11 @@ def main() -> None:
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     
     dataset = SceneDataset(config.scene_dir)
+    if config.debug_single_batch:
+        print("DEBUG SINGLE BATCH MODE: Restricting dataset to 1 image.")
+        dataset.image_paths = dataset.image_paths[:1]
+        dataset.cameras = dataset.cameras[:1]
+        
     ply_path = Path(config.scene_dir) / "init_gaussians.ply"
     if ply_path.exists():
         print(f"Loading initial points from {ply_path}")

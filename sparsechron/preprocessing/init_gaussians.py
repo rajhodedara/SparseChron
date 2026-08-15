@@ -67,9 +67,9 @@ def initialize_gaussians(
         (N, 1), inverse_sigmoid_01, dtype=points.dtype, device=points.device
     )
 
-    # SH Coeffs: (colors - 0.5) / 0.28209479177387814
-    sh_c0 = 0.28209479177387814
-    sh_coeffs = ((colors - 0.5) / sh_c0).unsqueeze(1)
+    # SH Coeffs: initialized using logit to work with sigmoid activation
+    colors_clamped = colors.clamp(min=1e-4, max=1.0-1e-4)
+    sh_coeffs = torch.log(colors_clamped / (1.0 - colors_clamped)).unsqueeze(1)
 
     return {
         "positions": points.clone(),
