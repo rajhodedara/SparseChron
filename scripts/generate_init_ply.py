@@ -41,10 +41,16 @@ def main():
         depth = np.load(depth_path)
         
         # FIX 1: Disparity Inversion (Depth Anything outputs inverse depth)
-        # High values = close (0.2), Low values = far (0.8)
-        depth_min = depth.min()
-        depth_max = depth.max()
-        depth_norm = 0.8 - 0.6 * (depth - depth_min) / (depth_max - depth_min + 1e-8)
+        # High values = close, Low values = far
+        # We scale depth to match the actual distance from camera to scene origin
+        dist_to_origin = np.linalg.norm(pose[:3, 3])
+        depth_min_val = max(0.5, dist_to_origin - 2.0)
+        depth_max_val = dist_to_origin + 2.0
+        
+        depth_min_arr = depth.min()
+        depth_max_arr = depth.max()
+        # If depth == depth_max_arr (closest), depth_norm == depth_min_val
+        depth_norm = depth_max_val - (depth_max_val - depth_min_val) * (depth - depth_min_arr) / (depth_max_arr - depth_min_arr + 1e-8)
         
         H, W = depth.shape
         img = cv2.resize(img, (W, H))
