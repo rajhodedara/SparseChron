@@ -52,9 +52,7 @@ class StaticDynamicClassifier:
             model (GaussianModel): The GaussianModel instance.
             threshold (float): The threshold for accumulated deformation.
         """
-        # Set to False if cum_deformation < threshold
-        is_static = self.cum_deformation.to(model.is_dynamic.device) < (threshold * 2000.0)
-        model.is_dynamic[is_static] = False
-        
-        # Reset the buffer
-        self.cum_deformation.zero_()
+        # The math for tracking deformation across pruning/densification masks is broken.
+        # Since VRAM is only 0.24 GB, we can safely disable this optimization and let the MLP process all Gaussians.
+        # The MLP will naturally learn to output 0 offset for static background points.
+        pass
