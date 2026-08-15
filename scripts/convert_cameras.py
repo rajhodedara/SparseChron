@@ -23,6 +23,12 @@ def main():
 
         R = np.array(cam_data["orientation"])
         t = np.array(cam_data["position"])
+        
+        # FIX: HyperNeRF uses OpenGL convention (Right, Up, Backward)
+        # 3DGS (gsplat) uses OpenCV convention (Right, Down, Forward)
+        # To convert C2W from OpenGL to OpenCV, we negate the local Y and Z axes
+        transform = np.array([[1, 0, 0], [0, -1, 0], [0, 0, -1]])
+        R = R @ transform
         fx = float(cam_data["focal_length"])
         fy = float(cam_data.get("focal_length_y", fx))
         
