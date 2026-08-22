@@ -69,7 +69,9 @@ def initialize_gaussians(
 
     # SH Coeffs: initialized using logit to work with sigmoid activation
     colors_clamped = colors.clamp(min=1e-4, max=1.0-1e-4)
-    sh_coeffs = torch.log(colors_clamped / (1.0 - colors_clamped)).unsqueeze(1)
+    # 3rd degree SH has 16 coefficients. First is DC, rest are 0.
+    sh_coeffs = torch.zeros((N, 16, 3), dtype=points.dtype, device=points.device)
+    sh_coeffs[:, 0, :] = torch.log(colors_clamped / (1.0 - colors_clamped))
 
     return {
         "positions": points.clone(),

@@ -57,7 +57,28 @@ class GaussianRenderer:
 
 
         # Use a smooth sigmoid activation to prevent dead gradients
-        colors = torch.sigmoid(sh_coeffs[:, 0, :]).contiguous()
+        # If we have higher degree SH, evaluate them using view directions
+        if sh_coeffs.shape[1] > 1:
+            from gsplat import spherical_harmonics
+            import math
+            
+            # Extract camera center in world space: C = -R^T * T
+            if hasattr(camera, 'R') and hasattr(camera, 'T'):
+                cam_center = -(camera.R.to(device).T @ camera.T.to(device).squeeze())
+            elif hasattr(camera, 'w2c'):
+                w2c = camera.w2c.to(device)
+                cam_center = -(w2c[:3, :3].T @ w2c[:3, 3])
+            else:
+                cam_center = torch.zeros(3, device=device)
+                
+            dirs = means - cam_center
+            dirs = torch.nn.functional.normalize(dirs, dim=-1)
+            degrees = int(math.sqrt(sh_coeffs.shape[1])) - 1
+            
+            sh_eval = spherical_harmonics(degrees, dirs, sh_coeffs)
+            colors = torch.sigmoid(sh_eval).contiguous()
+        else:
+            colors = torch.sigmoid(sh_coeffs[:, 0, :]).contiguous()
 
         # Build ks (intrinsics)
         k = torch.eye(3, dtype=torch.float32, device=device)

@@ -50,6 +50,9 @@ class TrainConfig:
     lr_rotation: float = 1e-3
     lr_deformation: float = 1e-4
 
+    # SH
+    sh_degree: int = 3
+
     # Losses
     lambda_depth: float = 0.1
     lambda_deform_reg: float = 0.01
