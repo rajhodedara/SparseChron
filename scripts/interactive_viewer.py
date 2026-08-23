@@ -89,13 +89,10 @@ def main():
     print(f"Run `npx localtunnel --port {args.port}` in another cell to get a public link!\n")
     
     # Add UI elements
+    # Add UI elements
     with server.gui.add_folder("4D Controls"):
         time_slider = server.gui.add_slider("Time", min=0.0, max=1.0, step=0.01, initial_value=0.0)
         res_slider = server.gui.add_slider("Resolution", min=256, max=1024, step=128, initial_value=512)
-        
-    # Turn off grid globally for better viewing of the background image
-    server.scene.world_axes.visible = False
-    server.scene.grid.visible = False
         
     @server.on_client_connect
     def _(client: viser.ClientHandle):
