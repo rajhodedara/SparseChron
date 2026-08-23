@@ -66,7 +66,7 @@ class TrainConfig:
     densify_until_iter: int = 15_000
     densify_interval: int = 100
     prune_interval: int = 500
-    max_gaussians: int = 500_000     # hard cap for VRAM safety
+    max_gaussians: int = 350_000     # hard cap for VRAM safety
 
     # Checkpoint
     checkpoint_interval_minutes: int = 30

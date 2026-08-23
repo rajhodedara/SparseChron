@@ -188,7 +188,7 @@ class Trainer:
 
                 self.optimizer.zero_grad()
                 
-            if iteration % 1000 == 0:
+            if iteration % self.config.prune_interval == 0:
                 torch.cuda.empty_cache()
             
             if iteration % 100 == 0:
