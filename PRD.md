@@ -88,10 +88,10 @@ from two recent papers:
   training based on its accumulated deformation magnitude (Hybrid 3D-4DGS
   strategy).  This saves VRAM and compute by not attaching deformation networks
   to static regions.
-- **Texture-aware deformation regularization** (Sparse4DGS): Penalize large
-  deformations in texture-rich regions where the photometric loss already
-  provides strong gradients; allow larger deformations in textureless regions
-  where regularization must fill the gap.
+- **Texture-aware & Temporal regularization**: 
+  - `temporal_smoothness_loss`: Penalizes high velocity changes between timesteps. To keep iteration speed fast and memory footprint low, we dynamically sample a randomized subset of up to 4096 active dynamic Gaussians to compute the temporal smoothness penalty.
+  - `static_regularization_loss`: Constrains background Gaussians (classified as non-dynamic) to have zero temporal deformation offsets, preventing floating artifacts.
+  - Custom image gradient loss to penalize large deformations in texture-rich regions.
 
 ### F4 — Training Pipeline
 
@@ -146,6 +146,7 @@ from two recent papers:
 |---|---|
 | **GPU** | Kaggle T4 (16 GB VRAM), 30 hrs/week, 9-hour session limit |
 | **Local dev** | Windows PC, no GPU — used for code editing, testing (CPU-only), and viewer development |
+| **Preprocessing** | Heavy DUSt3R pose/point generation can crash Kaggle due to host-RAM limits on large datasets. Replaced with direct coordinate parsing (`convert_hypernerf.py`) when datasets supply camera metadata and points.npy. |
 | **Checkpointing** | Must save every 30 minutes to survive Kaggle session timeouts |
 | **Dependencies** | Must work with PyTorch 2.x, gsplat (CUDA), and Kaggle's pre-installed environment |
 | **Reproducibility** | Fixed random seeds, deterministic data loading, documented hyperparameters |

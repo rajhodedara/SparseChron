@@ -18,16 +18,16 @@
 
 Traditional 4D Gaussian Splatting requires massive amounts of VRAM, dense multi-view video arrays, and pre-computed COLMAP camera poses. 
 
-**SparseChron** breaks these constraints. It is a custom 4DGS pipeline that synthesizes highly accurate 4D structures from just **10-15 uncalibrated sparse images** while operating strictly within a **16GB VRAM limit** (e.g., free Kaggle T4 GPUs). By fusing **Depth Anything V2** with **DUSt3R** for pose extraction and implementing dynamic compute-saving classifiers, SparseChron brings state-of-the-art scene synthesis to accessible hardware.
+**SparseChron** breaks these constraints. It is a custom 4DGS pipeline that synthesizes highly accurate 4D structures from just **10-15 uncalibrated sparse images** (or custom dynamic datasets like HyperNeRF) while operating strictly within a **16GB VRAM limit** (e.g., free Kaggle T4 GPUs). By using **DUSt3R** (or a lightweight direct parser like `convert_hypernerf.py` to bypass pre-processing OOMs) and implementing dynamic compute-saving classifiers alongside temporal regularization, SparseChron brings state-of-the-art dynamic scene synthesis to accessible hardware.
 
 ---
 
 ## ✨ Key Contributions
 
-- **🚫 Zero COLMAP Required:** Replaces traditional Structure-from-Motion (SfM) pipelines. Poses and metrics are dynamically extracted using DUSt3R and depth alignment.
-- **📉 Strict Memory Optimization:** Implements a hard cap of 500,000 Gaussians to prevent Out-Of-Memory (OOM) crashes on 16GB VRAM limits.
+- **🚫 Pre-processing OOM Bypass:** Replaces heavy SfM/DUSt3R runs with direct parser pipelines (e.g. `convert_hypernerf.py`) for large datasets, initializing Gaussians from points.npy and aligned OpenCV cameras.
+- **📉 strict Memory Optimization:** Implements a hard cap of 500,000 Gaussians to prevent Out-Of-Memory (OOM) crashes on 16GB VRAM limits.
 - **🧊 Static-Dynamic Freezing:** Introduces a `StaticDynamicClassifier` that identifies Gaussians that have stopped moving over time and freezes them, significantly reducing rasterization compute load.
-- **🎭 Texture-Aware Regularization:** Eliminates temporal "floating" artifacts in texture-less environments using a custom image gradient loss function.
+- **🎭 Temporal & Static Regularization:** Implements custom `temporal_smoothness_loss` (using randomized 4096-point dynamic subset sampling to keep training iterations blazing fast) and `static_regularization_loss` to prevent background deformation and floater artifacts.
 
 ---
 

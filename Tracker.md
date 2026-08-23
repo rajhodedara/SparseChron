@@ -94,6 +94,7 @@ completed and add notes where useful.
 | Date | Note |
 |---|---|
 | — | Project planning complete (PRD, TechSpec, AppFlow, Schema, ImplementationPlan, Rules, Tracker) |
+| Aug 23, 2026 | Replaced DUSt3R preprocessing pipeline with `convert_hypernerf.py` parser to bypass host OOM issues on Kaggle. Wired spatial static regularization and temporal smoothness loss (with dynamic 4096 subset sampling for speed). Fixed camera coordinate frame alignment. Verified training stability and memory scaling on Kaggle. |
 
 ---
 
