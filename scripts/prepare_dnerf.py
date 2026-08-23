@@ -26,7 +26,11 @@ def process_dnerf(scene_name="mutant", base_dir="data"):
         
     scene_path = base_path / scene_name
     if not scene_path.exists():
-        raise FileNotFoundError(f"Scene {scene_name} not found in extracted data!")
+        nested_path = base_path / "data" / scene_name
+        if nested_path.exists():
+            scene_path = nested_path
+        else:
+            raise FileNotFoundError(f"Scene {scene_name} not found! Check extracted contents.")
         
     # We will format this into our standard structure
     out_dir = base_path / f"dnerf_{scene_name}"
