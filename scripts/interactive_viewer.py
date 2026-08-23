@@ -93,13 +93,13 @@ def main():
         time_slider = server.gui.add_slider("Time", min=0.0, max=1.0, step=0.01, initial_value=0.0)
         res_slider = server.gui.add_slider("Resolution", min=256, max=1024, step=128, initial_value=512)
         
+    # Turn off grid globally for better viewing of the background image
+    server.scene.world_axes.visible = False
+    server.scene.grid.visible = False
+        
     @server.on_client_connect
     def _(client: viser.ClientHandle):
         print("Client connected!")
-        
-        # Turn off grid for better viewing of the background image
-        client.scene.world_axes.visible = False
-        client.scene.grid.visible = False
         
         def render_and_send():
             # Get current camera pose from Viser
