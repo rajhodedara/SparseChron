@@ -1,10 +1,26 @@
-"""Converts HyperNeRF dataset cameras to SparseChron format."""
-
 import json
 import argparse
 import numpy as np
 import shutil
 from pathlib import Path
+
+def _write_ply_ascii(ply_path, points, colors):
+    header = (
+        "ply\n"
+        "format ascii 1.0\n"
+        f"element vertex {len(points)}\n"
+        "property float x\n"
+        "property float y\n"
+        "property float z\n"
+        "property uchar red\n"
+        "property uchar green\n"
+        "property uchar blue\n"
+        "end_header\n"
+    )
+    with open(ply_path, "w") as f:
+        f.write(header)
+        for p, c in zip(points, colors):
+            f.write(f"{p[0]:.6f} {p[1]:.6f} {p[2]:.6f} {int(c[0])} {int(c[1])} {int(c[2])}\n")
 
 def convert_cameras(scene_dir: str, output_dir: str):
     scene_dir = Path(scene_dir)
@@ -15,15 +31,15 @@ def convert_cameras(scene_dir: str, output_dir: str):
         print(f"Error: Could not find {camera_dir}")
         return
         
-    # We will put cameras.json directly in the output folder, 
-    # but we ALSO need to copy the images there so the dataset loader finds everything together.
     output_dir.mkdir(parents=True, exist_ok=True)
     images_out_dir = output_dir / "images"
     images_out_dir.mkdir(exist_ok=True)
     
-    rgb_dir = scene_dir / "rgb" / "2x" # Prefer 2x
+    rgb_dir = scene_dir / "rgb" / "2x"
     if not rgb_dir.exists():
         rgb_dir = scene_dir / "rgb" / "1x"
+    if not rgb_dir.exists():
+        rgb_dir = scene_dir / "rgb"
         
     print(f"Copying images from {rgb_dir} to {images_out_dir}...")
     for img in rgb_dir.glob("*.png"):
@@ -34,21 +50,18 @@ def convert_cameras(scene_dir: str, output_dir: str):
         with open(cam_file, 'r') as f:
             cam_data = json.load(f)
             
-        # HyperNeRF cameras are Camera-to-World (C2W)
         R_c2w = np.array(cam_data["orientation"], dtype=np.float32)
         T_c2w = np.array(cam_data["position"], dtype=np.float32)
         
-        # Convert to World-to-Camera (W2C)
         R_w2c = R_c2w.T
         T_w2c = -R_w2c @ T_c2w
         
         fx = float(cam_data["focal_length"])
-        # HyperNeRF images were downscaled (e.g. 2x), but we must adjust intrinsics!
-        # The camera.json contains intrinsics for the 1x resolution!
-        # If we use 2x images, they are half the size, so we must divide intrinsics by 2.
         scale_factor = 1.0
         if "2x" in str(rgb_dir):
             scale_factor = 2.0
+        elif "4x" in str(rgb_dir):
+            scale_factor = 4.0
         
         fx = fx / scale_factor
         fy = fx
@@ -80,9 +93,18 @@ def convert_cameras(scene_dir: str, output_dir: str):
         
     print(f"Successfully converted {len(cameras_list)} cameras to {out_file}")
 
+    points_path = scene_dir / "points.npy"
+    if points_path.exists():
+        print(f"Found points.npy, converting to init_gaussians.ply...")
+        points = np.load(points_path)
+        colors = np.full((points.shape[0], 3), 255, dtype=np.uint8)
+        ply_path = output_dir / "init_gaussians.ply"
+        _write_ply_ascii(ply_path, points, colors)
+        print(f"Created {ply_path} with {len(points)} points.")
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--scene-dir", type=str, required=True, help="Path to original cut-lemon1 dataset root (contains camera/ and rgb/ folders)")
+    parser.add_argument("--scene-dir", type=str, required=True, help="Path to original dataset root")
     parser.add_argument("--output-dir", type=str, required=True, help="Path to save the generated dataset for training")
     args = parser.parse_args()
     
