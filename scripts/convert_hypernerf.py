@@ -53,10 +53,6 @@ def convert_cameras(scene_dir: str, output_dir: str):
         R_c2w = np.array(cam_data["orientation"], dtype=np.float32)
         T_c2w = np.array(cam_data["position"], dtype=np.float32)
         
-        # Convert from OpenGL (Y-up, Z-back) to OpenCV (Y-down, Z-forward)
-        flip_mat = np.diag([1.0, -1.0, -1.0])
-        R_c2w = R_c2w @ flip_mat
-        
         R_w2c = R_c2w.T
         T_w2c = -R_w2c @ T_c2w
         
