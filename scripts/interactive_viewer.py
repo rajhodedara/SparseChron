@@ -144,7 +144,7 @@ def main():
                 img_np = (img_tensor.cpu().numpy() * 255).astype(np.uint8)
                 
                 # Send to Viser as background
-                client.set_background_image(img_np, format="jpeg", depth=1.0)
+                client.scene.set_background_image(img_np, format="jpeg")
 
         # Attach callbacks
         @client.camera.on_update
