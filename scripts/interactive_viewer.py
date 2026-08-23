@@ -133,19 +133,8 @@ def main():
             
             timestep = time_slider.value
             
-            # Query Deformation MLP
             with torch.no_grad():
-                # Pass all points to MLP (or use static/dynamic mask if needed)
-                d_xyz, d_rot, d_scale = deform(
-                    model.get_xyz, 
-                    torch.full((model.get_xyz.shape[0], 1), timestep, device="cuda")
-                )
-                
-                deformed_params = {
-                    "xyz": model.get_xyz + d_xyz,
-                    "rotation": model.get_rotation + d_rot,
-                    "scaling": model.get_scaling + d_scale
-                }
+                deformed_params = model.get_deformed(deform, timestep)
                 
                 # Render
                 render_dict = renderer.render(model, camera, deformed_params=deformed_params)
