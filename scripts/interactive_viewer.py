@@ -13,7 +13,7 @@ from pathlib import Path
 # Add project root to path
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-from sparsechron.utils.config import load_config
+from sparsechron.utils.config import TrainConfig
 from sparsechron.models.gaussian_model import GaussianModel
 from sparsechron.models.deformation import DeformationMLP
 from sparsechron.models.renderer import GaussianRenderer
@@ -58,12 +58,11 @@ def load_models(config, checkpoint_path):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--config", type=str, default="configs/dnerf_default.yaml")
     parser.add_argument("--checkpoint", type=str, required=True, help="Path to checkpoint.pth")
     parser.add_argument("--port", type=int, default=8080)
     args = parser.parse_args()
 
-    config = load_config(args.config)
+    config = TrainConfig()
     
     # Initialize CUDA if available
     if not torch.cuda.is_available():
