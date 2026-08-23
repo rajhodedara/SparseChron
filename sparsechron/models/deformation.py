@@ -67,17 +67,27 @@ class DeformationMLP(nn.Module):
         """Computes positional encoding for the input tensor.
 
         Args:
-            x (torch.Tensor): Input tensor.
+            x (torch.Tensor): Input tensor (N, D).
             num_freqs (int): Number of frequencies.
 
         Returns:
             torch.Tensor: Positionally encoded tensor.
         """
-        encodings = [x]
-        for i in range(num_freqs):
-            encodings.append(torch.sin((2.0**i) * x))
-            encodings.append(torch.cos((2.0**i) * x))
-        return torch.cat(encodings, dim=-1)
+        if num_freqs == 0:
+            return x
+            
+        freqs = 2.0 ** torch.arange(num_freqs, device=x.device, dtype=x.dtype)
+        args = x.unsqueeze(-1) * freqs  # (N, D, num_freqs)
+        sin_vals = torch.sin(args)
+        cos_vals = torch.cos(args)
+        
+        # Stack to (N, D, num_freqs, 2), then permute to (N, num_freqs, 2, D)
+        # to alternate: freq0_sin, freq0_cos, freq1_sin, freq1_cos...
+        stacked = torch.stack([sin_vals, cos_vals], dim=-1)
+        permuted = stacked.permute(0, 2, 3, 1)
+        flattened = permuted.reshape(x.shape[0], -1)
+        
+        return torch.cat([x, flattened], dim=-1)
 
     def forward(
         self, positions: torch.Tensor, times: torch.Tensor
