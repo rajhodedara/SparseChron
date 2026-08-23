@@ -13,7 +13,11 @@ from sparsechron.training.checkpoint import save_checkpoint, load_checkpoint, fi
 from sparsechron.utils.timer import Timer
 from sparsechron.losses.photometric import photometric_loss
 from sparsechron.losses.depth import depth_loss
-from sparsechron.losses.regularization import texture_regularization_loss
+from sparsechron.losses.regularization import (
+    texture_regularization_loss,
+    static_regularization_loss,
+    temporal_smoothness_loss,
+)
 from sparsechron.models.deformation import DeformationMLP
 from sparsechron.models.classifier import StaticDynamicClassifier
 
@@ -123,6 +127,33 @@ class Trainer:
                     
                     reg_loss = texture_regularization_loss(d_pos_dyn, proj_pts_dyn, gt_image)
                     loss = loss + self.config.lambda_deform_reg * reg_loss
+
+                    # 1. Static Regularization (apply to non-dynamic points)
+                    d_pos_static = deformed_params["d_pos"][~self.model.is_dynamic]
+                    loss_static = static_regularization_loss(d_pos_static)
+                    loss = loss + getattr(self.config, 'lambda_static_reg', 0.01) * loss_static
+
+                    # 2. Temporal Smoothness (Random subsample of dynamic points)
+                    dynamic_mask = self.model.is_dynamic
+                    if dynamic_mask.any():
+                        num_dynamic = dynamic_mask.sum().item()
+                        sample_size = min(getattr(self.config, 'temporal_sample_size', 4096), num_dynamic)
+                        
+                        dynamic_indices = torch.nonzero(dynamic_mask).squeeze(1)
+                        perm = torch.randperm(num_dynamic, device=self.model.positions.device)[:sample_size]
+                        subset_indices = dynamic_indices[perm]
+                        
+                        d_pos_t1 = deformed_params["d_pos"][subset_indices]
+                        
+                        delta = 0.05
+                        timestep_t2 = min(1.0, timestep + delta)
+                        subset_pos = self.model.positions[subset_indices]
+                        times_t2 = torch.full((sample_size, 1), timestep_t2, device=subset_pos.device, dtype=subset_pos.dtype)
+                        
+                        d_pos_t2, _, _ = self.deformation_mlp(subset_pos, times_t2)
+                        
+                        loss_temporal = temporal_smoothness_loss(d_pos_t1, d_pos_t2)
+                        loss = loss + getattr(self.config, 'lambda_temporal_smoothness', 0.1) * loss_temporal
                 
             if not torch.isfinite(loss):
                 print(f"Warning: Non-finite loss at iteration {iteration}. Halving learning rates and skipping step.")

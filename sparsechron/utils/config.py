@@ -56,6 +56,9 @@ class TrainConfig:
     # Losses
     lambda_depth: float = 0.1
     lambda_deform_reg: float = 0.01
+    lambda_static_reg: float = 0.01
+    lambda_temporal_smoothness: float = 0.1
+    temporal_sample_size: int = 4096
     ssim_weight: float = 0.2         # in combined L1+SSIM loss
 
     # Densification & pruning
