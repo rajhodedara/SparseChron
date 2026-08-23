@@ -158,6 +158,9 @@ def main():
         @res_slider.on_update
         def _(_):
             render_and_send()
+            
+        # Force initial render so the screen isn't black
+        render_and_send()
 
     # Keep main thread alive
     while True:
