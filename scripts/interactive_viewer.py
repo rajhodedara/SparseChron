@@ -14,7 +14,7 @@ from pathlib import Path
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 from sparsechron.utils.config import TrainConfig
-from sparsechron.models.gaussian_model import GaussianModel
+from sparsechron.models.gaussians import GaussianModel
 from sparsechron.models.deformation import DeformationMLP
 from sparsechron.models.renderer import GaussianRenderer
 
