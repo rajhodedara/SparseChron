@@ -64,3 +64,26 @@ def texture_regularization_loss(
     loss = (weights * d_pos_sq).mean()
 
     return loss
+
+def static_regularization_loss(d_pos: torch.Tensor, l1_weight: float = 1.0) -> torch.Tensor:
+    """Encourages sparsity in deformations (Static-Dynamic Separation).
+    
+    Penalizes the absolute magnitude of deformations so that background 
+    Gaussians stay perfectly static rather than drifting.
+    """
+    if d_pos.numel() == 0:
+        return torch.tensor(0.0, device=d_pos.device, requires_grad=True)
+    return l1_weight * torch.abs(d_pos).mean()
+
+def temporal_smoothness_loss(d_pos_t1: torch.Tensor, d_pos_t2: torch.Tensor) -> torch.Tensor:
+    """Penalizes high-velocity jitter between adjacent timesteps.
+    
+    Args:
+        d_pos_t1: Deformation at time t
+        d_pos_t2: Deformation at time t + delta
+    """
+    if d_pos_t1.numel() == 0 or d_pos_t2.numel() == 0:
+        return torch.tensor(0.0, device=d_pos_t1.device, requires_grad=True)
+    
+    velocity = d_pos_t2 - d_pos_t1
+    return (velocity ** 2).mean()
