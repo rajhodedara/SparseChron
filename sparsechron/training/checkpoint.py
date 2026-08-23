@@ -66,6 +66,33 @@ def load_checkpoint(
     path = Path(path)
     checkpoint = torch.load(path, map_location="cpu")
     
+    # Handle size mismatch by resizing GaussianModel parameters and buffers if needed
+    model_state = checkpoint["model_state_dict"]
+    for name, param in list(model.named_parameters()):
+        if name in model_state:
+            chk_shape = model_state[name].shape
+            if param.shape != chk_shape:
+                new_param = nn.Parameter(torch.zeros(chk_shape, dtype=param.dtype, device=param.device))
+                setattr(model, name, new_param)
+                
+                # Update references in optimizer
+                if optimizer:
+                    for group in optimizer.param_groups:
+                        for i, p in enumerate(group['params']):
+                            if p is param:
+                                group['params'][i] = new_param
+                                # Migrate state
+                                if p in optimizer.state:
+                                    optimizer.state[new_param] = optimizer.state.pop(p)
+                                break
+                                
+    for name, buf in list(model.named_buffers()):
+        if name in model_state:
+            chk_shape = model_state[name].shape
+            if buf.shape != chk_shape:
+                new_buf = torch.zeros(chk_shape, dtype=buf.dtype, device=buf.device)
+                setattr(model, name, new_buf)
+                
     model.load_state_dict(checkpoint["model_state_dict"])
     if optimizer and checkpoint.get("optimizer_state_dict"):
         optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
