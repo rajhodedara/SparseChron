@@ -50,7 +50,7 @@ def process_dnerf(scene_name="mutant", base_dir="data"):
     
     focal = .5 * w / np.tan(.5 * camera_angle_x)
     
-    cameras_dict = {}
+    cameras_list = []
     
     print("Converting cameras and copying images...")
     for i, frame in enumerate(meta['frames']):
@@ -72,17 +72,20 @@ def process_dnerf(scene_name="mutant", base_dir="data"):
         R = w2c[:3, :3]
         T = w2c[:3, 3]
         
-        cameras_dict[img_name] = {
+        cameras_list.append({
+            "image_name": img_name,
             "R": R.tolist(),
             "T": T.tolist(),
-            "focal_length": [focal, focal],
-            "principal_point": [w / 2, h / 2],
+            "fx": focal,
+            "fy": focal,
+            "cx": w / 2.0,
+            "cy": h / 2.0,
             "width": w,
             "height": h
-        }
+        })
         
     with open(out_dir / "cameras.json", 'w') as f:
-        json.dump(cameras_dict, f, indent=4)
+        json.dump(cameras_list, f, indent=4)
         
     print(f"\nDone! Dataset prepared at: {out_dir}")
     print(f"To train, run:")
