@@ -22,8 +22,8 @@ class SimpleCamera:
     def __init__(self, R, T, width, height, fx, fy, cx, cy):
         self.R = torch.tensor(R, dtype=torch.float32, device="cuda")
         self.T = torch.tensor(T, dtype=torch.float32, device="cuda")
-        self.image_width = int(width)
-        self.image_height = int(height)
+        self.width = int(width)
+        self.height = int(height)
         self.fx = fx
         self.fy = fy
         self.cx = cx
@@ -31,27 +31,40 @@ class SimpleCamera:
 
 def load_models(config, checkpoint_path):
     print("Loading models...")
-    model = GaussianModel(config.sh_degree)
-    
-    # Setup deformation MLP
-    deform = DeformationMLP(
-        D=8, W=256,
-        input_ch=3, input_ch_time=1,
-        skips=[4],
-        empty_voxel=False,
-        is_blender=True # Ensure correct positional encoding
-    ).to("cuda")
-    
-    renderer = GaussianRenderer(config)
+    device = torch.device("cuda")
     
     # Load checkpoint
-    ckpt = torch.load(checkpoint_path, map_location="cpu")
+    ckpt = torch.load(checkpoint_path, map_location=device)
+    state_dict = ckpt.get("model_state_dict", ckpt)
     
-    # Load Gaussian params
-    model.restore(ckpt["model_state_dict"], config)
+    num_gaussians = state_dict["_positions"].shape[0]
+    sh_degree = state_dict["_sh_coeffs"].shape[1]
     
-    # Load deformation MLP weights
-    deform.load_state_dict(ckpt["deform_state_dict"])
+    dummy_values = {
+        "positions": torch.zeros((num_gaussians, 3), device=device),
+        "scales": torch.zeros((num_gaussians, 3), device=device),
+        "rotations": torch.zeros((num_gaussians, 4), device=device),
+        "opacities": torch.zeros((num_gaussians, 1), device=device),
+        "sh_coeffs": torch.zeros((num_gaussians, sh_degree, 3), device=device),
+    }
+    
+    model = GaussianModel(dummy_values)
+    model.load_state_dict(state_dict, strict=False)
+    if "is_dynamic" in state_dict:
+        model.is_dynamic = state_dict["is_dynamic"].to(device)
+    model.to(device)
+    model.eval()
+    
+    # Setup deformation MLP
+    deform = DeformationMLP()
+    if "deformation_mlp_state_dict" in ckpt:
+        deform.load_state_dict(ckpt["deformation_mlp_state_dict"])
+    elif "deformation_state_dict" in ckpt:
+        deform.load_state_dict(ckpt["deformation_state_dict"])
+    deform.to(device)
+    deform.eval()
+    
+    renderer = GaussianRenderer()
     
     print("Models loaded successfully!")
     return model, deform, renderer
@@ -141,8 +154,8 @@ def main():
                 render_dict = renderer.render(model, camera, deformed_params=deformed_params)
                 
                 # Convert to uint8 numpy array
-                img_tensor = render_dict["render"].clamp(0, 1) # [3, H, W]
-                img_np = (img_tensor.permute(1, 2, 0).cpu().numpy() * 255).astype(np.uint8)
+                img_tensor = render_dict["rgb"].clamp(0, 1) # [H, W, 3]
+                img_np = (img_tensor.cpu().numpy() * 255).astype(np.uint8)
                 
                 # Send to Viser as background
                 client.set_background_image(img_np, format="jpeg", depth=1.0)
