@@ -14,3 +14,4 @@ safetensors>=0.4.0
 roma
 einops
 timm
+viser
