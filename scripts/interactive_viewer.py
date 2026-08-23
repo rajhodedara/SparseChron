@@ -102,7 +102,7 @@ def main():
             # Get current camera pose from Viser
             cam = client.camera
             
-            # Viser provides c2w quaternion and position (OpenGL format: Y up, Z backward)
+            # Viser cameras already follow the OpenCV convention (+Z forward, +Y down, +X right).
             R_c2w = vtf.SO3(cam.wxyz).as_matrix()
             T_c2w = np.array(cam.position)
             
@@ -110,11 +110,8 @@ def main():
             c2w[:3, :3] = R_c2w
             c2w[:3, 3] = T_c2w
             
-            # Convert to OpenCV (w2c, Y down, Z forward)
-            c2w_cv = c2w.copy()
-            c2w_cv[:, 1:3] *= -1 # Flip Y and Z
-            
-            w2c = np.linalg.inv(c2w_cv)
+            # We can directly invert c2w to get the w2c matrix expected by gsplat.
+            w2c = np.linalg.inv(c2w)
             R = w2c[:3, :3]
             T = w2c[:3, 3]
             
