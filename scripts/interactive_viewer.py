@@ -92,7 +92,7 @@ def main():
     # Add UI elements
     with server.gui.add_folder("4D Controls"):
         time_slider = server.gui.add_slider("Time", min=0.0, max=1.0, step=0.01, initial_value=0.0)
-        res_slider = server.gui.add_slider("Resolution", min=256, max=1024, step=128, initial_value=384)
+        res_slider = server.gui.add_slider("Resolution", min=256, max=1024, step=128, initial_value=512)
         
     @server.on_client_connect
     def _(client: viser.ClientHandle):
@@ -141,7 +141,7 @@ def main():
                 img_np = (img_tensor.cpu().numpy() * 255).astype(np.uint8)
                 
                 # Send to Viser as background
-                client.scene.set_background_image(img_np, format="jpeg", jpeg_quality=60)
+                client.scene.set_background_image(img_np, format="jpeg")
 
         # Attach callbacks
         @client.camera.on_update
