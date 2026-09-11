@@ -1,7 +1,7 @@
 """Dataset loading and processing."""
 
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, Tuple
 
 import torch
 from torch.utils.data import Dataset
@@ -18,17 +18,31 @@ class SceneDataset(Dataset):
     """Dataset for scene images, cameras, and optional depth maps."""
     
     def __init__(
-        self, scene_dir: Path | str, split: str = "train", downscale: int = 1
+        self, scene_dir: Path | str, split: str = "train", downscale: int = 1,
+        test_every_n: int = 8,
+        scene_transform: Optional[Tuple[np.ndarray, float]] = None,
     ) -> None:
         """Initializes the SceneDataset.
         
         Args:
             scene_dir (Path | str): Path to the scene directory.
-            split (str): Split to use ("train" or "test").
+            split (str): Split to use ("train" or "test"). With test_every_n > 0,
+                every n-th image (0-based stride) is held out for the "test" split
+                and excluded from "train". Set test_every_n=0 to disable splitting
+                (both splits then contain all images).
             downscale (int): Downscale factor for images and cameras. Defaults to 1.
+            test_every_n (int): Stride for holdout; 0 disables splitting.
+            scene_transform: Optional (center, scale) normalization computed by
+                train.py from the init point cloud; applied to world cameras so
+                all splits share one normalized coordinate frame.
         """
         self.scene_dir = Path(scene_dir)
+        if split not in ("train", "test"):
+            raise ValueError(f"split must be 'train' or 'test', got {split!r}")
+        if test_every_n < 0:
+            raise ValueError(f"test_every_n must be >= 0, got {test_every_n}")
         self.split = split
+        self.test_every_n = test_every_n
         if downscale <= 0:
             raise ValueError(f"downscale must be strictly positive, got {downscale}")
         self.downscale = downscale
@@ -48,6 +62,24 @@ class SceneDataset(Dataset):
         if not self.image_paths:
             raise RuntimeError(f"No images found in {self.images_dir}")
             
+        # Apply train/test holdout BEFORE camera loading so the two lists stay
+        # aligned: cameras are loaded with the same index mask and filtered below.
+        self._all_image_paths = self.image_paths
+        all_cam_indices = list(range(len(self.image_paths)))
+        if self.test_every_n == 1:
+            raise ValueError("test_every_n=1 would leave the train split empty; use >= 2 or 0 to disable splitting")
+        if self.test_every_n > 0:
+            if self.split == "test":
+                self._heldout_indices = [i for i in all_cam_indices if i % self.test_every_n == 0]
+            else:
+                self._heldout_indices = [i for i in all_cam_indices if i % self.test_every_n != 0]
+        else:
+            # Splitting disabled: both splits contain all images.
+            self._heldout_indices = all_cam_indices
+        if not self._heldout_indices:
+            raise RuntimeError(f"Split '{self.split}' selected 0 images (test_every_n={self.test_every_n}, total={len(self._all_image_paths)})")
+        self.image_paths = [self._all_image_paths[i] for i in self._heldout_indices]
+            
         # Determine loader
         if (self.scene_dir / "cameras.json").exists():
             self.cameras = load_dust3r_cameras(self.scene_dir)
@@ -57,13 +89,23 @@ class SceneDataset(Dataset):
             self.cameras = load_colmap_cameras(self.scene_dir)
         else:
             raise RuntimeError(f"No camera data found in {self.scene_dir}")
-            
+        
+        # Keep only the cameras belonging to this split. Loaders return one
+        # camera per image in the same sorted order as _all_image_paths.
+        self.cameras = [self.cameras[i] for i in self._heldout_indices]
         if len(self.cameras) != len(self.image_paths):
             raise RuntimeError(
                 f"Mismatch between number of images ({len(self.image_paths)}) "
                 f"and cameras ({len(self.cameras)})"
             )
-            
+
+        # Scene normalization (optional): rescale world cameras into a unit box
+        # so scale-dependent thresholds stay meaningful. The matching transform
+        # is applied to the init point cloud in train.py.
+        self._scene_transform_applied = False
+        self.scene_transform = scene_transform
+        self.apply_scene_transform(scene_transform)
+
         # Compute scene center for depth normalization
         rays = []
         for cam in self.cameras:
@@ -83,7 +125,11 @@ class SceneDataset(Dataset):
             A += proj
             b += proj @ t
             
-        self.scene_center = np.linalg.solve(A, b)
+        try:
+            self.scene_center = np.linalg.solve(A, b)
+        except np.linalg.LinAlgError:
+            # Sparse near-parallel camera rigs make A singular; lstsq is robust.
+            self.scene_center = np.linalg.lstsq(A, b, rcond=None)[0]
             
         # Automatically detect physical image size and correct camera intrinsics if they don't match
         with Image.open(self.image_paths[0]) as img:
@@ -121,6 +167,37 @@ class SceneDataset(Dataset):
                     T=cam.T.clone()
                 )
                 
+    def apply_scene_transform(
+        self, scene_transform: Optional[Tuple[np.ndarray, float]]
+    ) -> None:
+        """Rescales world-space cameras: X' = (X - center) / scale.
+
+        Camera rotations are unchanged; translations are recomputed from the
+        transformed camera centers so renders stay geometrically consistent.
+        Safe to call multiple times; only the first call has an effect.
+        """
+        if scene_transform is None or getattr(self, "_scene_transform_applied", False):
+            return
+        center, scale = scene_transform
+        center = torch.as_tensor(center, dtype=torch.float32).reshape(3)
+        for i, cam in enumerate(self.cameras):
+            R = cam.R.detach().to(torch.float32).cpu()
+            T = cam.T.detach().to(torch.float32).cpu().reshape(3)
+            cam_center = -(R.T @ T)                     # world-space camera center
+            cam_center = (cam_center - center) / scale  # normalized center
+            new_T = -(R @ cam_center)
+            self.cameras[i] = Camera(
+                fx=cam.fx,
+                fy=cam.fy,
+                cx=cam.cx,
+                cy=cam.cy,
+                width=cam.width,
+                height=cam.height,
+                R=cam.R.clone(),
+                T=new_T,
+            )
+        self._scene_transform_applied = True
+
     def __len__(self) -> int:
         return len(self.image_paths)
         
@@ -194,5 +271,7 @@ class SceneDataset(Dataset):
             "camera": self.cameras[idx],
             "image": img_tensor,
             "depth": depth_tensor,
-            "timestep": float(idx) / max(1, len(self.image_paths) - 1)
+            # Map back to the ORIGINAL frame index so train and test splits share
+            # one consistent timeline in [0, 1].
+            "timestep": float(self._heldout_indices[idx]) / max(1, len(self._all_image_paths) - 1)
         }

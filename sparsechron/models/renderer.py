@@ -4,11 +4,19 @@ from typing import Dict, Any, Optional
 from sparsechron.models.gaussians import GaussianModel
 from sparsechron.utils.camera import Camera
 
+import math
+
 try:
-    from gsplat import rasterization
+    from gsplat import rasterization, spherical_harmonics
     HAS_GSPLAT = True
-except ImportError:
-    HAS_GSPLAT = False
+except ImportError as e:
+    # Fail fast: silently returning black images used to let training run for
+    # hours against constant-zero renders with no error (wasted Kaggle sessions).
+    raise ImportError(
+        "gsplat could not be imported; the CUDA rasterizer is required for "
+        "training and evaluation. Install it with `pip install gsplat>=1.0.0` "
+        "and verify your torch/CUDA build matches the available wheel."
+    ) from e
 
 
 class GaussianRenderer:
@@ -36,12 +44,6 @@ class GaussianRenderer:
         """
         device = model.positions.device
 
-        if not HAS_GSPLAT:
-            return {
-                "rgb": torch.zeros((camera.height, camera.width, 3), device=device),
-                "depth": torch.zeros((camera.height, camera.width, 1), device=device)
-            }
-
         if deformed_params is not None:
             means = deformed_params["positions"].contiguous()
             quats = deformed_params["rotations"].contiguous()
@@ -56,12 +58,9 @@ class GaussianRenderer:
             sh_coeffs = model.sh_coeffs
 
 
-        # Use a smooth sigmoid activation to prevent dead gradients
-        # If we have higher degree SH, evaluate them using view directions
+        # Standard 3DGS color convention: SH output + 0.5 baseline, clamped
+        # to [0, 1]. If we have higher degree SH, evaluate using view dirs.
         if sh_coeffs.shape[1] > 1:
-            from gsplat import spherical_harmonics
-            import math
-            
             # Extract camera center in world space: C = -R^T * T
             if hasattr(camera, 'R') and hasattr(camera, 'T'):
                 cam_center = -(camera.R.to(device).T @ camera.T.to(device).squeeze())
@@ -76,9 +75,9 @@ class GaussianRenderer:
             degrees = int(math.sqrt(sh_coeffs.shape[1])) - 1
             
             sh_eval = spherical_harmonics(degrees, dirs, sh_coeffs)
-            colors = torch.sigmoid(sh_eval).contiguous()
+            colors = torch.clamp(sh_eval + 0.5, 0.0, 1.0).contiguous()
         else:
-            colors = torch.sigmoid(sh_coeffs[:, 0, :]).contiguous()
+            colors = torch.clamp(sh_coeffs[:, 0, :] + 0.5, 0.0, 1.0).contiguous()
 
         # Build ks (intrinsics)
         k = torch.eye(3, dtype=torch.float32, device=device)

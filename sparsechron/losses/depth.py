@@ -12,9 +12,11 @@ def depth_loss(pred_depth: torch.Tensor, gt_depth: torch.Tensor) -> torch.Tensor
     """
     assert isinstance(pred_depth, torch.Tensor), "pred_depth must be a torch.Tensor"
     assert isinstance(gt_depth, torch.Tensor), "gt_depth must be a torch.Tensor"
-    
-    pred_depth = pred_depth.squeeze(-1)
-    gt_depth = gt_depth.squeeze(-1)
+
+    # Correlation math in fp32: under autocast, fp16 variances over a full
+    # image can underflow and corrupt the Pearson ratio.
+    pred_depth = pred_depth.squeeze(-1).float()
+    gt_depth = gt_depth.squeeze(-1).float()
     
     valid_mask = (gt_depth > 0) & torch.isfinite(gt_depth)
     if not valid_mask.any():

@@ -46,8 +46,18 @@ def load_dust3r_cameras(scene_dir: Path | str) -> List[Camera]:
             R_w2c = R_c2w.T
             T_w2c = -R_w2c @ T_c2w
             
-            width = item.get("width", int(intrinsics[2] * 2))
-            height = item.get("height", int(intrinsics[3] * 2))
+            width = item.get("width")
+            height = item.get("height")
+            if width is None or height is None:
+                # Fallback assumes a centered principal point; warn loudly since
+                # a wrong image plane silently degrades every render.
+                print(
+                    "Warning: cameras.json entry is missing width/height; "
+                    "inferring from the principal point (cx*2, cy*2). "
+                    "Verify these intrinsics!"
+                )
+                width = int(intrinsics[2] * 2)
+                height = int(intrinsics[3] * 2)
 
             cam = Camera(
                 fx=float(intrinsics[0]),

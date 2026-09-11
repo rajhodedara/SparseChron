@@ -25,7 +25,8 @@ Traditional 4D Gaussian Splatting requires massive amounts of VRAM, dense multi-
 ## ✨ Key Contributions
 
 - **🚫 Pre-processing OOM Bypass:** Replaces heavy SfM/DUSt3R runs with direct parser pipelines (e.g. `convert_hypernerf.py`) for large datasets, initializing Gaussians from points.npy and aligned OpenCV cameras.
-- **📉 strict Memory Optimization:** Implements a hard cap of 500,000 Gaussians to prevent Out-Of-Memory (OOM) crashes on 16GB VRAM limits.
+- **📉 strict Memory Optimization:** Implements a hard cap of 350,000 Gaussians (configurable) to prevent Out-Of-Memory (OOM) crashes on 16GB VRAM limits.
+- **✂️ Gradient-based Cloning & Splitting:** 3DGS-style adaptive density control — oversized Gaussians are split into smaller children, small ones are cloned, and transparent/oversized Gaussians are pruned, all under a strict VRAM budget.
 - **🧊 Static-Dynamic Freezing:** Introduces a `StaticDynamicClassifier` that identifies Gaussians that have stopped moving over time and freezes them, significantly reducing rasterization compute load.
 - **🎭 Temporal & Static Regularization:** Implements custom `temporal_smoothness_loss` (using randomized 4096-point dynamic subset sampling to keep training iterations blazing fast) and `static_regularization_loss` to prevent background deformation and floater artifacts.
 
@@ -70,15 +71,12 @@ pip install -r requirements.txt
 
 ## ☁️ The Kaggle Training Workflow
 
-SparseChron was specifically engineered to be trained across disjoint, 9-hour free Kaggle sessions without losing progress.
+SparseChron is engineered for disjoint 9-hour free Kaggle sessions. Note that `/kaggle/working` is wiped when an interactive session ends — checkpoints persist across sessions by **chaining notebook versions**:
 
-1. **Upload Notebook**: Import `notebooks/sparsechron_train.ipynb` into a new Kaggle session.
-2. **Mount Data**: Attach your image dataset to the Kaggle notebook environment.
-3. **Run All**: The notebook will autonomously:
-   - Install all required dependencies and submodules.
-   - Look for the latest `.ckpt` file in your output directory to resume training instantly.
-   - Run the training loop while printing `max_vram_allocated()` logs every 100 iterations.
-4. **Seamless Resumption**: When Kaggle inevitably terminates your session at the 9-hour limit, simply restart the machine. The custom `find_latest_checkpoint` utility will load your progress effortlessly!
+1. **Upload Notebook**: Import `sparsechron_kaggle.ipynb` (repo root) into a new Kaggle session.
+2. **Enable GPU + Internet**: Settings → Accelerator → GPU T4; Internet on (phone-verified account) for git/pip/wget.
+3. **Run All**: The notebook autonomously installs dependencies (preferring a prebuilt gsplat wheel to skip the ~15 min JIT compile), downloads and converts the dataset, restores checkpoints attached from a previous version's output, and trains with VRAM logging every 100 iterations plus periodic validation renders + PSNR.
+4. **Chain sessions**: After a session ends, **Save Version**, then in the next session attach this notebook's latest output via **+ Input → Your Work** and Run All — the restore cell copies the checkpoints in and `find_latest_checkpoint` resumes training automatically.
 
 ---
 

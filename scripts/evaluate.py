@@ -1,6 +1,10 @@
 """Evaluate a trained SparseChron model."""
 
+import json
 import pathlib
+from typing import Optional
+
+import numpy as np
 import tyro
 import torch
 
@@ -20,6 +24,7 @@ def main(
     dataset_path: str,
     output_dir: str = "evaluation_output",
     is_4d: bool = True,
+    transform_json: Optional[str] = None,
 ) -> None:
     """Evaluates a trained SparseChron model on a dataset.
 
@@ -28,6 +33,8 @@ def main(
         dataset_path: Path to the dataset directory.
         output_dir: Directory to save outputs.
         is_4d: Whether the model is 4D (deformation).
+        transform_json: Scene-normalization JSON written by train.py. Defaults
+            to `scene_transform.json` next to the checkpoint when present.
     """
     device = torch.device(
         "cuda" if torch.cuda.is_available() else "cpu"
@@ -91,6 +98,20 @@ def main(
     print(f"Loading dataset from {dataset_path}...")
     dataset = SceneDataset(dataset_path)
     print(f"  {len(dataset)} images loaded.")
+
+    # Apply the training-time scene normalization so cameras match the model.
+    if transform_json is None:
+        candidate = pathlib.Path(checkpoint_path).parent / "scene_transform.json"
+        transform_json = str(candidate) if candidate.exists() else None
+    if transform_json and pathlib.Path(transform_json).exists():
+        with open(transform_json, "r") as f:
+            tdata = json.load(f)
+        scene_transform = (
+            np.asarray(tdata["center"], dtype=np.float32),
+            float(tdata["scale"]),
+        )
+        dataset.apply_scene_transform(scene_transform)
+        print(f"  Applied scene transform from {transform_json}")
 
     # --- Render novel views ---
     renderer = GaussianRenderer()

@@ -36,16 +36,25 @@ def apply_offsets(
 class DeformationMLP(nn.Module):
     """MLP for computing temporal deformations of 3D Gaussians."""
 
-    def __init__(self, spatial_freqs: int = 6, time_freqs: int = 6) -> None:
+    def __init__(
+        self,
+        spatial_freqs: int = 6,
+        time_freqs: int = 6,
+        max_displacement: float = 1.0,
+    ) -> None:
         """Initializes the DeformationMLP.
 
         Args:
             spatial_freqs (int): Number of frequencies for spatial encoding.
             time_freqs (int): Number of frequencies for time encoding.
+            max_displacement (float): Clamp for the per-frame position offset,
+                in scene units (normalized scenes: [-1, 1]). The identity init
+                (zero offsets) is unaffected; this only guards fp16 blowups.
         """
         super().__init__()
         self.spatial_freqs = spatial_freqs
         self.time_freqs = time_freqs
+        self.max_displacement = float(max_displacement)
 
         in_channels = 3 + 3 * 2 * spatial_freqs + 1 + 1 * 2 * time_freqs
         hidden_channels = 128
@@ -107,7 +116,7 @@ class DeformationMLP(nn.Module):
         x = torch.cat([pos_enc, time_enc], dim=-1)
         output = self.mlp(x)
 
-        d_pos = output[..., :3]
+        d_pos = output[..., :3].clamp(-self.max_displacement, self.max_displacement)
         d_rot = output[..., 3:7]
         d_scale = output[..., 7:10]
 

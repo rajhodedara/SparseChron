@@ -20,7 +20,8 @@ def initialize_gaussians(
             - scales: (N, 3) tensor of scales in log-space.
             - rotations: (N, 4) tensor of identity quaternions.
             - opacities: (N, 1) tensor of inverse-sigmoid opacities.
-            - sh_coeffs: (N, 1, 3) tensor of spherical harmonics DC coefficients.
+            - sh_coeffs: (N, 16, 3) tensor of spherical harmonics coefficients
+              (DC term stores color - 0.5 per the standard +0.5 convention).
             
     Raises:
         ValueError: If input shapes are incorrect.
@@ -67,11 +68,12 @@ def initialize_gaussians(
         (N, 1), inverse_sigmoid_01, dtype=points.dtype, device=points.device
     )
 
-    # SH Coeffs: initialized using logit to work with sigmoid activation
-    colors_clamped = colors.clamp(min=1e-4, max=1.0-1e-4)
+    # SH Coeffs: standard 3DGS convention stores (color - 0.5) in the DC term;
+    # the renderer adds 0.5 back and clamps to [0, 1].
+    colors_clamped = colors.clamp(min=0.0, max=1.0)
     # 3rd degree SH has 16 coefficients. First is DC, rest are 0.
     sh_coeffs = torch.zeros((N, 16, 3), dtype=points.dtype, device=points.device)
-    sh_coeffs[:, 0, :] = torch.log(colors_clamped / (1.0 - colors_clamped))
+    sh_coeffs[:, 0, :] = colors_clamped - 0.5
 
     return {
         "positions": points.clone(),
