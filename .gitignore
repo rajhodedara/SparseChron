@@ -1,27 +1,39 @@
-/data/
-outputs/
-__pycache__/
-*.ckpt
-*.npy
-
-/data/
-outputs/
-__pycache__/
-*.ckpt
-*.npy
-
 # Standard Python ignores
+__pycache__/
 *.egg-info/
 build/
 dist/
 .pytest_cache/
 .ruff_cache/
+.mypy_cache/
 .venv/
 venv/
-.mypy_cache/
 
-# Datasets and outputs
+# Data, datasets and outputs
+/data/
+outputs/
 cut-lemon1/
 interp_cut-lemon/
 interp_cut-lemon.zip
+mutant_renders_extracted/
 evaluation_output/
+*.ckpt
+*.npy
+*.ply
+
+# Local agent/tool state (not part of the project)
+.agents/
+.openclaw/
+.openclaw-attachments/
+.opencode/
+config/
+memory/
+
+# Personal workspace files (never commit these to the public repo)
+AGENTS.md
+HEARTBEAT.md
+IDENTITY.md
+SOUL.md
+TOOLS.md
+USER.md
+3 DWM Experiment 3 - 3 DWM Experiment 3.pdf
