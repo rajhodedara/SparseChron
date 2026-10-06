@@ -1,7 +1,7 @@
 """Export a trained SparseChron model to a standard 3DGS PLY file.
 
 The exported PLY opens in browser-based Gaussian-splat viewers such as
-SuperSplat (https://play.splats.studio) or any 3DGS-compatible tool — no
+SuperSplat (https://superspl.at/editor) or any 3DGS-compatible tool — no
 dedicated GPU or CUDA required locally, since those viewers render via WebGL.
 
 Note: a PLY stores a single canonical pose; the 4D motion itself lives in the
@@ -60,10 +60,33 @@ def main() -> None:
                         help="Canonical timestep to bake into the exported positions.")
     parser.add_argument("--sh-degree", type=int, default=0, choices=[0, 1, 2, 3],
                         help="Truncate SH to this degree (0 = view-independent colors, smallest file).")
+    parser.add_argument("--max-scale", type=float, default=0.0,
+                        help="Drop Gaussians whose max activated scale exceeds this "
+                             "(0 = keep all). Useful for removing huge background-filler "
+                             "splats that fog up external viewers.")
+    parser.add_argument("--min-opacity", type=float, default=0.0,
+                        help="Drop Gaussians whose activated opacity is below this (0 = keep all).")
     args = parser.parse_args()
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model, deformation_mlp = load_model(args.checkpoint_path, device, args.is_4d)
+
+    if args.max_scale > 0 or args.min_opacity > 0:
+        with torch.no_grad():
+            keep = torch.ones(model._positions.shape[0], dtype=torch.bool,
+                              device=model._positions.device)
+            if args.max_scale > 0:
+                keep &= torch.exp(model._scales).max(dim=-1).values <= args.max_scale
+            if args.min_opacity > 0:
+                keep &= torch.sigmoid(model._opacities).squeeze(-1) > args.min_opacity
+        dropped = int((~keep).sum())
+        print(f"Cleanup: dropping {dropped:,} filler Gaussians "
+              f"({100 * dropped / keep.shape[0]:.1f}%), keeping {int(keep.sum()):,}.")
+        for name in ["_positions", "_scales", "_rotations", "_opacities", "_sh_coeffs"]:
+            param = getattr(model, name)
+            setattr(model, name, torch.nn.Parameter(param.data[keep], requires_grad=False))
+        if model.is_dynamic.shape[0] == keep.shape[0]:
+            model.is_dynamic = model.is_dynamic[keep]
 
     with torch.no_grad():
         if deformation_mlp is not None:
@@ -126,7 +149,7 @@ def main() -> None:
 
     size_mb = out.stat().st_size / (1024 * 1024)
     print(f"Exported {n} Gaussians to {out} ({size_mb:.1f} MB, SH degree {args.sh_degree}).")
-    print("Open it at https://play.splats.studio (browser, no GPU needed).")
+    print("Open it at https://superspl.at/editor (browser, no GPU needed).")
 
 
 if __name__ == "__main__":
