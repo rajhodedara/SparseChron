@@ -6,6 +6,10 @@ from sparsechron.utils.camera import Camera
 
 import math
 
+# Standard 3DGS SH DC scaling factor (spherical_harmonics applies it internally
+# for the full-SH path; the degree-0 fallback below must apply it itself).
+SH_C0 = 0.28209479177387814
+
 try:
     from gsplat import rasterization, spherical_harmonics
     HAS_GSPLAT = True
@@ -77,7 +81,7 @@ class GaussianRenderer:
             sh_eval = spherical_harmonics(degrees, dirs, sh_coeffs)
             colors = torch.clamp(sh_eval + 0.5, 0.0, 1.0).contiguous()
         else:
-            colors = torch.clamp(sh_coeffs[:, 0, :] + 0.5, 0.0, 1.0).contiguous()
+            colors = torch.clamp(SH_C0 * sh_coeffs[:, 0, :] + 0.5, 0.0, 1.0).contiguous()
 
         # Build ks (intrinsics)
         k = torch.eye(3, dtype=torch.float32, device=device)

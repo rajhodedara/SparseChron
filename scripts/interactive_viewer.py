@@ -132,7 +132,14 @@ def main():
             
             with torch.no_grad():
                 deformed_params = model.get_deformed(deform, timestep)
-                
+
+                # Compact models overfit their view-dependent SH color to the
+                # training cameras; from novel directions the higher-order terms
+                # produce unstable rainbow colors. The interactive viewer
+                # therefore renders with base (DC) colors only - stable from
+                # every angle. Full-SH appearance is unchanged in eval/renders.
+                deformed_params["sh_coeffs"] = deformed_params["sh_coeffs"][:, :1, :]
+
                 # Render
                 render_dict = renderer.render(model, camera, deformed_params=deformed_params)
                 
