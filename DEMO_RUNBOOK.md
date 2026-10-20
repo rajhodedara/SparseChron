@@ -39,8 +39,8 @@ After cell 3b, re-run the LAST cell — the viewer automatically uses the August
 
 ## Last cell output — how to read it
 
-- **Top line** (`curl ifconfig.me`): the tunnel **password** (an IP address)
-- **Bottom**: the `https://xxxx.loca.lt` link → open it, paste the password
+- **Top line** (`curl ifconfig.me`): Cloudflare Tunnel URL (**zero passwords required**)
+- **Bottom**: the `https://xxxx.loca.lt` link → open it, no password needed
 - Wait ~20–30 s → drag to orbit, **Resolution slider → 1024** for sharpness, scrub **TIME slider**
 
 ## If something misbehaves
