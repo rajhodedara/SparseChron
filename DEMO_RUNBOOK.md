@@ -1,5 +1,19 @@
 # 🎬 SparseChron — 4D Viewer Demo Runbook
 
+## ⚡ Quickest Live Demo (Recommended: notebooks/demo_runner.ipynb)
+
+Use **notebooks/demo_runner.ipynb** for a 30-second live presentation of the **August High-Motion Model** (347k Gaussians, leaping mutant):
+1. Import **notebooks/demo_runner.ipynb** to Kaggle
+2. Settings: **Internet ON**, **Accelerator = GPU T4**
+3. Run all 3 cells in order:
+   - **Cell 1:** Fast setup & CUDA cache (~15s)
+   - **Cell 2:** Download August model & stage shaders (~15s)
+   - **Cell 3:** Launch live 4D viewer + tunnel (~15s)
+
+---
+
+## Full Evaluation Demo (notebooks/kaggle_demo.ipynb)
+
 ## Before the slot (30–45 min early)
 
 1. Open **notebooks/kaggle_demo.ipynb** on Kaggle (File → Import Notebook, once)
