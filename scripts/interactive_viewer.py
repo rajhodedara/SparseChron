@@ -144,7 +144,9 @@ def main():
                 render_dict = renderer.render(model, camera, deformed_params=deformed_params)
                 
                 # Convert to uint8 numpy array
-                img_tensor = render_dict["rgb"].clamp(0, 1) # [H, W, 3]
+                img_tensor = render_dict["rgb"].clamp(0, 1)
+                if img_tensor.ndim == 4:
+                    img_tensor = img_tensor.squeeze(0)
                 img_np = (img_tensor.cpu().numpy() * 255).astype(np.uint8)
                 
                 # Send to Viser as background
