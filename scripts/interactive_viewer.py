@@ -96,61 +96,72 @@ def main():
         
     @server.on_client_connect
     def _(client: viser.ClientHandle):
-        print("Client connected!")
+        print("Client connected!", flush=True)
+        
+        # Position camera to look directly at the model
+        try:
+            client.camera.position = (0.0, -3.5, 0.5)
+            client.camera.look_at = (0.0, 0.0, 0.5)
+        except Exception:
+            pass
         
         def render_and_send():
-            # Get current camera pose from Viser
-            cam = client.camera
-            
-            # Viser cameras already follow the OpenCV convention (+Z forward, +Y down, +X right).
-            R_c2w = vtf.SO3(cam.wxyz).as_matrix()
-            T_c2w = np.array(cam.position)
-            
-            c2w = np.eye(4)
-            c2w[:3, :3] = R_c2w
-            c2w[:3, 3] = T_c2w
-            
-            # We can directly invert c2w to get the w2c matrix expected by gsplat.
-            w2c = np.linalg.inv(c2w)
-            R = w2c[:3, :3]
-            T = w2c[:3, 3]
-            
-            # Resolution and intrinsics
-            width = res_slider.value
-            height = int(width / cam.aspect)
-            
-            # Calculate focal length from vertical FOV
-            fy = (height / 2.0) / np.tan(cam.fov / 2.0)
-            fx = fy # Assume square pixels
-            
-            cx = width / 2.0
-            cy = height / 2.0
-            
-            camera = SimpleCamera(R, T, width, height, fx, fy, cx, cy)
-            
-            timestep = time_slider.value
-            
-            with torch.no_grad():
-                deformed_params = model.get_deformed(deform, timestep)
-
-                # Compact models overfit their view-dependent SH color to the
-                # training cameras; from novel directions the higher-order terms
-                # produce unstable rainbow colors. The interactive viewer
-                # therefore renders with base (DC) colors only - stable from
-                # every angle. Full-SH appearance is unchanged in eval/renders.
-                deformed_params["sh_coeffs"] = deformed_params["sh_coeffs"][:, :1, :]
-
-                # Render
-                render_dict = renderer.render(model, camera, deformed_params=deformed_params)
+            try:
+                # Get current camera pose from Viser
+                cam = client.camera
                 
-                # Convert to uint8 numpy array
-                img_tensor = render_dict["rgb"].clamp(0, 1)
-                if img_tensor.ndim == 4:
-                    img_tensor = img_tensor.squeeze(0)
-                img_np = (img_tensor.cpu().numpy() * 255).astype(np.uint8)
+                # Viser cameras already follow the OpenCV convention (+Z forward, +Y down, +X right).
+                R_c2w = vtf.SO3(cam.wxyz).as_matrix()
+                T_c2w = np.array(cam.position)
                 
-                # Send to Viser as background
-                client.scene.set_background_image(img_np, format="jpeg")
+                c2w = np.eye(4)
+                c2w[:3, :3] = R_c2w
+                c2w[:3, 3] = T_c2w
+                
+                # We can directly invert c2w to get the w2c matrix expected by gsplat.
+                w2c = np.linalg.inv(c2w)
+                R = w2c[:3, :3]
+                T = w2c[:3, 3]
+                
+                # Resolution and intrinsics
+                width = res_slider.value
+                height = int(width / max(cam.aspect, 0.01))
+                
+                # Calculate focal length from vertical FOV
+                fy = (height / 2.0) / np.tan(max(cam.fov / 2.0, 0.01))
+                fx = fy # Assume square pixels
+                
+                cx = width / 2.0
+                cy = height / 2.0
+                
+                camera = SimpleCamera(R, T, width, height, fx, fy, cx, cy)
+                
+                timestep = time_slider.value
+                
+                with torch.no_grad():
+                    deformed_params = model.get_deformed(deform, timestep)
+
+                    # Truncate to degree 0 (DC base diffuse color) for rock-solid
+                    # stable colors from every novel angle without rainbow glaze
+                    if "sh_coeffs" in deformed_params and deformed_params["sh_coeffs"].shape[1] > 1:
+                        deformed_params["sh_coeffs"] = deformed_params["sh_coeffs"][:, :1, :]
+
+                    # Render
+                    render_dict = renderer.render(model, camera, deformed_params=deformed_params)
+                    
+                    # Convert to uint8 numpy array
+                    img_tensor = render_dict["rgb"].clamp(0, 1)
+                    if img_tensor.ndim == 4:
+                        img_tensor = img_tensor.squeeze(0)
+                    img_np = (img_tensor.cpu().numpy() * 255).astype(np.uint8)
+                    
+                    # Send to Viser as background
+                    client.scene.set_background_image(img_np, format="jpeg")
+                    print(f"Rendered frame at t={timestep:.2f}, res={width}x{height}", flush=True)
+            except Exception as e:
+                import traceback
+                print(f"ERROR in render_and_send: {e}", flush=True)
+                traceback.print_exc()
 
         # Attach callbacks
         @client.camera.on_update
