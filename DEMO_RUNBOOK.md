@@ -9,7 +9,7 @@
 
 | Cell | What | Time |
 |---|---|---|
-| 1 | Clone repo + pip install | 10–15 min, **silent is normal** (gsplat compile) |
+| 1 | Clone repo + pip install | ~1–2 min (fast T4 compile, wheel pre-cached) |
 | 2 | Download D-NeRF mutant data | 2–5 min |
 | 3 | Download checkpoint (GitHub release) | ~1 min — prints iteration + Gaussians |
 | 4 | Eval | ~5 min — prints PSNR/SSIM/LPIPS |
